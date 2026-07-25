@@ -4,6 +4,12 @@ export interface ProductImage {
 }
 
 
+export interface Specification {
+  key:string;
+  value:string;
+}
+
+
 export interface Product {
 
   _id:string;
@@ -34,6 +40,11 @@ export interface Product {
   discountPercentage?:number;
 
 
+  discountStartDate?:string;
+
+  discountEndDate?:string;
+
+
   stock:number;
 
 
@@ -42,7 +53,9 @@ export interface Product {
 
   images:ProductImage[];
 
+
   isNewArrival:boolean;
+
   isFeatured:boolean;
 
   isBestSeller:boolean;
@@ -56,6 +69,47 @@ export interface Product {
 
 
   tags:string[];
+
+
+
+  // Product Variants
+
+  sizes?:string[];
+
+  colors?:string[];
+
+
+
+  // Specifications
+
+  specifications?:Specification[];
+
+
+
+  // Electronics
+
+  storageCapacity?:string;
+
+  ramSize?:string;
+
+  processorType?:string;
+
+
+
+  // Fashion
+
+  fabricType?:string;
+
+  material?:string;
+
+
+
+  warrantyPeriod?:string;
+
+
+
+  freeShipping?:boolean;
+
 
 
   createdAt:string;

@@ -7,11 +7,15 @@ import { Search, Edit, Trash2, Plus, Package, Star, TrendingUp, AlertTriangle, L
 import { toast } from "sonner";
 import { getAdminProducts, removeProduct } from "@/services/product.service";
 import { Product } from "@/types/product";
+import { useCurrency } from "@/context/CurrencyContext"; // 1. useCurrency import kora holo
 
 export default function AdminProductsPage() {
   const [products, setProducts] = useState<Product[]>([]);
   const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState("");
+  
+  // 2. formatPrice function extract kora holo
+  const { formatPrice } = useCurrency();
 
   const loadProducts = async () => {
     try {
@@ -105,7 +109,12 @@ export default function AdminProductsPage() {
       ) : (
         <div className="grid gap-6 md:grid-cols-2 xl:grid-cols-3">
           {filteredProducts.map((product) => (
-            <ProductCard key={product._id} product={product} onDelete={() => deleteProduct(product._id)} />
+            <ProductCard 
+              key={product._id} 
+              product={product} 
+              onDelete={() => deleteProduct(product._id)} 
+              formatPrice={formatPrice} // 3. formatPrice prop hishabe pass kora holo
+            />
           ))}
         </div>
       )}
@@ -114,7 +123,10 @@ export default function AdminProductsPage() {
 }
 
 // Sub-components for better maintainability
-function ProductCard({ product, onDelete }: { product: Product; onDelete: () => void }) {
+function ProductCard({ product, onDelete, formatPrice }: { product: Product; onDelete: () => void; formatPrice: (price: number) => string }) {
+  const activePrice = product.discountPrice > 0 ? product.discountPrice : product.price;
+  const originalPrice = product.price;
+
   return (
     <div className="group rounded-3xl border border-gray-100 bg-white p-5 shadow-sm hover:shadow-xl transition-all">
       <div className="relative h-60 overflow-hidden rounded-2xl bg-gray-100">
@@ -125,9 +137,10 @@ function ProductCard({ product, onDelete }: { product: Product; onDelete: () => 
       <h2 className="mt-4 truncate text-lg font-bold">{product.name}</h2>
       <p className="text-sm text-gray-500">{typeof product.category === "object" ? product.category.name : "Uncategorized"}</p>
 
+      {/* 4. formatPrice use kora holo */}
       <div className="mt-3 flex items-center gap-3">
-        <span className="text-xl font-black">${product.discountPrice > 0 ? product.discountPrice : product.price}</span>
-        {product.discountPrice > 0 && <span className="line-through text-gray-400 text-sm">${product.price}</span>}
+        <span className="text-xl font-black">{formatPrice(activePrice)}</span>
+        {product.discountPrice > 0 && <span className="line-through text-gray-400 text-sm">{formatPrice(originalPrice)}</span>}
       </div>
 
       <div className="mt-5 flex items-center justify-between">

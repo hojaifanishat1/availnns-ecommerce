@@ -8,6 +8,32 @@ import {
   addDiscountPercentageToProducts,
 } from "../utils/product";
 
+
+// ===============================
+// PARSE FORM DATA JSON
+// ===============================
+
+const parseJSON = (value:any)=>{
+
+  if(!value) return undefined;
+
+
+  if(typeof value === "string"){
+
+    try{
+      return JSON.parse(value);
+    }
+    catch{
+      return value;
+    }
+
+  }
+
+
+  return value;
+
+};
+
 // ===============================
 // CREATE PRODUCT
 // ===============================
@@ -36,15 +62,70 @@ export const createProduct = async (req: Request, res: Response): Promise<void> 
 
       images.push({ url: result.secure_url, public_id: result.public_id });
     }
+const productData:any = {
 
-    const product = await Product.create({
-      ...req.body,
-      slug,
-      images,
-      isPublished: true,
-      isFeatured: req.body.isFeatured === "true",
-      isBestSeller: req.body.isBestSeller === "true",
-    });
+  ...req.body,
+
+  slug,
+
+  images,
+
+  isPublished:true,
+
+  isFeatured:
+  req.body.isFeatured === "true",
+
+  isBestSeller:
+  req.body.isBestSeller === "true",
+
+  isNewArrival:
+  req.body.isNewArrival === "true",
+
+};
+
+
+
+// FIX ARRAYS
+
+productData.specifications =
+parseJSON(req.body.specifications)
+||
+[];
+
+
+productData.sizes =
+parseJSON(req.body.sizes)
+||
+[];
+
+
+productData.colors =
+parseJSON(req.body.colors)
+||
+[];
+
+
+
+// FIX NUMBER
+
+if(req.body.price)
+productData.price =
+Number(req.body.price);
+
+
+if(req.body.discountPrice)
+productData.discountPrice =
+Number(req.body.discountPrice);
+
+
+if(req.body.stock)
+productData.stock =
+Number(req.body.stock);
+
+
+
+const product =
+await Product.create(productData);
 
     res.status(201).json({
       success: true,
@@ -114,6 +195,8 @@ export const getProducts = async (req: Request, res: Response): Promise<void> =>
   }
 };
 
+
+
 // ===============================
 // GET PRODUCT BY ID
 // ===============================
@@ -173,11 +256,25 @@ export const updateProduct = async (req: Request, res: Response): Promise<void> 
       data.images = [...(data.images || []), ...newImages];
     }
 
-    if (req.body.price) data.price = Number(req.body.price);
-    if (req.body.discountPrice) data.discountPrice = Number(req.body.discountPrice);
-    if (req.body.stock) data.stock = Number(req.body.stock);
+    // FIX ARRAYS
+    if (req.body.specifications !== undefined) {
+      data.specifications = parseJSON(req.body.specifications) || [];
+    }
+    if (req.body.sizes !== undefined) {
+      data.sizes = parseJSON(req.body.sizes) || [];
+    }
+    if (req.body.colors !== undefined) {
+      data.colors = parseJSON(req.body.colors) || [];
+    }
+
+    // FIX NUMBERS & BOOLEANS
+    if (req.body.price !== undefined) data.price = Number(req.body.price);
+    if (req.body.discountPrice !== undefined) data.discountPrice = Number(req.body.discountPrice);
+    if (req.body.stock !== undefined) data.stock = Number(req.body.stock);
+    
     if (req.body.isFeatured !== undefined) data.isFeatured = req.body.isFeatured === "true";
     if (req.body.isBestSeller !== undefined) data.isBestSeller = req.body.isBestSeller === "true";
+    if (req.body.isNewArrival !== undefined) data.isNewArrival = req.body.isNewArrival === "true";
 
     const updatedProduct = await Product.findByIdAndUpdate(req.params.id, data, { new: true });
 
