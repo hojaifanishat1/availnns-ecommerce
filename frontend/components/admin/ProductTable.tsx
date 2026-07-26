@@ -7,19 +7,21 @@ import {
   Trash2,
   Star,
   Flame,
+  Zap,
 } from "lucide-react";
-import { useCurrency } from "@/context/CurrencyContext"; // Apnar path onujayi hook import korun
+import { useCurrency } from "@/context/CurrencyContext";
 
 type Props = {
   products: any[];
   onDelete: (id: string) => void;
+  onDealToggle?: (id: string, currentStatus: boolean) => void;
 };
 
 export default function ProductTable({
   products,
   onDelete,
+  onDealToggle,
 }: Props) {
-  // Global Currency Provider theke formatPrice niye asha hocche
   const { formatPrice } = useCurrency();
 
   return (
@@ -33,6 +35,7 @@ export default function ProductTable({
               <th className="p-5 text-left">Price</th>
               <th className="p-5 text-left">Stock</th>
               <th className="p-5 text-left">Status</th>
+              <th className="p-5 text-left">Mark Deal</th>
               <th className="p-5 text-left">Action</th>
             </tr>
           </thead>
@@ -73,7 +76,6 @@ export default function ProductTable({
                     : "N/A"}
                 </td>
 
-                {/* formatPrice use kore dynamic currency & rate apply kora holo */}
                 <td className="p-5 font-bold text-zinc-900">
                   {formatPrice(
                     product.discountPrice || product.price
@@ -97,7 +99,7 @@ export default function ProductTable({
                 </td>
 
                 <td className="p-5">
-                  <div className="flex gap-2">
+                  <div className="flex flex-wrap gap-2">
                     {product.isFeatured && (
                       <span className="flex items-center gap-1 rounded-full bg-yellow-100 text-yellow-800 px-2.5 py-1 text-xs font-medium">
                         <Star size={12} />
@@ -111,7 +113,29 @@ export default function ProductTable({
                         Best
                       </span>
                     )}
+
+                    {product.isDeal && (
+                      <span className="flex items-center gap-1 rounded-full bg-amber-100 text-amber-800 px-2.5 py-1 text-xs font-medium">
+                        <Zap size={12} />
+                        Deal
+                      </span>
+                    )}
                   </div>
+                </td>
+
+                <td className="p-5">
+                  <label className="flex items-center gap-2 cursor-pointer text-sm font-medium text-zinc-700">
+                    <input
+                      type="checkbox"
+                      checked={!!product.isDeal}
+                      onChange={() =>
+                        onDealToggle &&
+                        onDealToggle(product._id, !!product.isDeal)
+                      }
+                      className="w-4 h-4 accent-black rounded cursor-pointer"
+                    />
+                    Deal
+                  </label>
                 </td>
 
                 <td className="p-5">

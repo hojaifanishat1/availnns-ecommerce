@@ -1,164 +1,127 @@
 import { Types } from "mongoose";
 
-
 export interface IProductImage {
+  url: string;
 
-  url:string;
-
-  public_id:string;
-
+  public_id: string;
 }
-
-
 
 export interface IProductSpecification {
+  key: string;
 
-  key:string;
-
-  value:string;
-
+  value: string;
 }
 
-
-
 export interface IProduct {
+  name: string;
 
+  slug: string;
 
-  name:string;
+  description: string;
 
+  category: Types.ObjectId;
 
-  slug:string;
+  brand?: string;
 
+  sku?: string;
 
-  description:string;
+  price: number;
 
+  discountPrice?: number;
 
-  category:Types.ObjectId;
+  discountStartDate?: Date;
 
+  discountEndDate?: Date;
 
+  stock: number;
 
-  brand?:string;
+  lowStockThreshold?: number;
 
+  weight?: number;
 
-  sku?:string;
+  images: IProductImage[];
 
+  sizes?: string[];
 
+  colors?: string[];
 
-  price:number;
+  specifications?: IProductSpecification[];
 
+  tags?: string[];
 
-  discountPrice?:number;
+  // =========================
+  // PRODUCT FLAGS
+  // =========================
 
+  isFeatured: boolean;
 
-  discountStartDate?:Date;
+  isBestSeller: boolean;
 
+  isNewArrival: boolean;
 
-  discountEndDate?:Date;
+  isDeal: boolean;
 
+  totalSold?: number; // <-- এই লাইনটি যুক্ত করা হয়েছে
 
+  isPublished: boolean;
 
-  stock:number;
+  isDigital: boolean;
 
+  freeShipping: boolean;
 
-  lowStockThreshold?:number;
+  // =========================
+  // REVIEWS
+  // =========================
 
+  rating: number;
 
-  weight?:number;
+  numReviews: number;
 
+  // =========================
+  // SEO
+  // =========================
 
+  metaTitle?: string;
 
-  images:IProductImage[];
+  metaDescription?: string;
 
+  // =========================
+  // ELECTRONICS
+  // =========================
 
+  warrantyPeriod?: string;
 
-  sizes?:string[];
+  storageCapacity?: string;
 
+  ramSize?: string;
 
-  colors?:string[];
+  screenSize?: string;
 
+  processorType?: string;
 
-  specifications?:IProductSpecification[];
+  // =========================
+  // FASHION
+  // =========================
 
+  fabricType?: string;
 
+  fitType?: string;
 
-  tags?:string[];
+  waistRise?: string;
 
+  material?: string;
 
+  strapType?: string;
 
-  isFeatured:boolean;
+  soleMaterial?: string;
 
+  capStyle?: string;
 
-  isBestSeller:boolean;
+  // =========================
+  // TIMESTAMPS
+  // =========================
 
+  createdAt?: Date;
 
-  isNewArrival:boolean;
-
-
-  isPublished:boolean;
-
-
-  isDigital:boolean;
-
-
-  freeShipping:boolean;
-
-
-
-  rating:number;
-
-
-  numReviews:number;
-
-
-
-  metaTitle?:string;
-
-
-  metaDescription?:string;
-
-
-
-  warrantyPeriod?:string;
-
-
-  storageCapacity?:string;
-
-
-  ramSize?:string;
-
-
-  screenSize?:string;
-
-
-  processorType?:string;
-
-
-
-  fabricType?:string;
-
-
-  fitType?:string;
-
-
-  waistRise?:string;
-
-
-  material?:string;
-
-
-  strapType?:string;
-
-
-  soleMaterial?:string;
-
-
-  capStyle?:string;
-
-
-
-  createdAt?:Date;
-
-
-  updatedAt?:Date;
-
+  updatedAt?: Date;
 }

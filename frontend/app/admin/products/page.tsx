@@ -3,18 +3,17 @@
 import { useEffect, useState, useMemo } from "react";
 import Link from "next/link";
 import Image from "next/image";
-import { Search, Edit, Trash2, Plus, Package, Star, TrendingUp, AlertTriangle, Loader2 } from "lucide-react";
+import { Search, Edit, Trash2, Plus, Package, Star, TrendingUp, AlertTriangle, Flame } from "lucide-react";
 import { toast } from "sonner";
-import { getAdminProducts, removeProduct } from "@/services/product.service";
+import { getAdminProducts, removeProduct, updateDealStatus } from "@/services/product.service";
 import { Product } from "@/types/product";
-import { useCurrency } from "@/context/CurrencyContext"; // 1. useCurrency import kora holo
+import { useCurrency } from "@/context/CurrencyContext";
 
 export default function AdminProductsPage() {
   const [products, setProducts] = useState<Product[]>([]);
   const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState("");
   
-  // 2. formatPrice function extract kora holo
   const { formatPrice } = useCurrency();
 
   const loadProducts = async () => {
@@ -46,6 +45,32 @@ export default function AdminProductsPage() {
       toast.success("Product deleted successfully");
     } catch (error) {
       toast.error("Failed to delete product");
+    }
+  };
+
+  const handleDealToggle = async (productId: string, currentStatus: boolean) => {
+    try {
+      const token = localStorage.getItem("token");
+      if (!token) {
+        toast.error("Please login first");
+        return;
+      }
+
+      const nextStatus = !currentStatus;
+      // সার্ভিস ফাইলের updateDealStatus ফাংশন ব্যবহার করা হলো
+      const data = await updateDealStatus(productId, nextStatus, token);
+
+      if (data.success) {
+        setProducts((prev) =>
+          prev.map((p) => (p._id === productId ? { ...p, isDeal: nextStatus } : p))
+        );
+        toast.success("Deal status updated successfully");
+      } else {
+        toast.error(data.message || "Failed to update deal status");
+      }
+    } catch (error) {
+      console.error(error);
+      toast.error("Something went wrong");
     }
   };
 
@@ -113,7 +138,8 @@ export default function AdminProductsPage() {
               key={product._id} 
               product={product} 
               onDelete={() => deleteProduct(product._id)} 
-              formatPrice={formatPrice} // 3. formatPrice prop hishabe pass kora holo
+              onDealToggle={() => handleDealToggle(product._id, !!product.isDeal)}
+              formatPrice={formatPrice} 
             />
           ))}
         </div>
@@ -123,7 +149,7 @@ export default function AdminProductsPage() {
 }
 
 // Sub-components for better maintainability
-function ProductCard({ product, onDelete, formatPrice }: { product: Product; onDelete: () => void; formatPrice: (price: number) => string }) {
+function ProductCard({ product, onDelete, onDealToggle, formatPrice }: { product: Product; onDelete: () => void; onDealToggle: () => void; formatPrice: (price: number) => string }) {
   const activePrice = product.discountPrice > 0 ? product.discountPrice : product.price;
   const originalPrice = product.price;
 
@@ -132,18 +158,30 @@ function ProductCard({ product, onDelete, formatPrice }: { product: Product; onD
       <div className="relative h-60 overflow-hidden rounded-2xl bg-gray-100">
         <Image src={product.images?.[0]?.url || "/placeholder.png"} alt={product.name} fill className="object-cover transition group-hover:scale-105" />
         {product.discountPrice > 0 && <span className="absolute left-3 top-3 rounded-full bg-red-500 px-3 py-1 text-xs text-white font-bold">SALE</span>}
+        {product.isDeal && <span className="absolute right-3 top-3 rounded-full bg-amber-500 px-3 py-1 text-xs text-white font-bold flex items-center gap-1"><Flame size={12}/> DEAL</span>}
       </div>
 
       <h2 className="mt-4 truncate text-lg font-bold">{product.name}</h2>
       <p className="text-sm text-gray-500">{typeof product.category === "object" ? product.category.name : "Uncategorized"}</p>
 
-      {/* 4. formatPrice use kora holo */}
       <div className="mt-3 flex items-center gap-3">
         <span className="text-xl font-black">{formatPrice(activePrice)}</span>
         {product.discountPrice > 0 && <span className="line-through text-gray-400 text-sm">{formatPrice(originalPrice)}</span>}
       </div>
 
-      <div className="mt-5 flex items-center justify-between">
+      <div className="mt-4 flex items-center justify-between border-t border-gray-100 pt-3">
+        <label className="flex items-center gap-2 cursor-pointer text-sm font-medium text-gray-700">
+          <input
+            type="checkbox"
+            checked={!!product.isDeal}
+            onChange={onDealToggle}
+            className="w-4 h-4 accent-black rounded cursor-pointer"
+          />
+          Mark as Deal
+        </label>
+      </div>
+
+      <div className="mt-3 flex items-center justify-between">
         <p className="text-sm font-medium">Stock: <span className={product.stock < 10 ? "text-red-500 font-bold" : "text-green-600 font-bold"}>{product.stock}</span></p>
         <div className="flex gap-2">
           <Link href={`/admin/products/edit/${product._id}`} className="p-2 rounded-lg bg-gray-100 hover:bg-gray-200"><Edit size={16} /></Link>

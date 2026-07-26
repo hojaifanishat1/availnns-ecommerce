@@ -200,13 +200,18 @@ export const createOrder = async (req: Request, res: Response): Promise<void> =>
     const createdOrder = order[0];
 
     // ===============================
-    // STOCK REDUCE
+    // STOCK REDUCE & TOTAL SOLD UPDATE
     // ===============================
     await Product.bulkWrite(
       cart.items.map((item: any) => ({
         updateOne: {
           filter: { _id: item.product._id },
-          update: { $inc: { stock: -item.quantity } }
+          update: { 
+            $inc: { 
+              stock: -item.quantity,
+              totalSold: item.quantity 
+            } 
+          }
         }
       })),
       { session }
@@ -421,7 +426,12 @@ export const cancelOrder = async (req: Request, res: Response): Promise<void> =>
       order.items.map((item: any) => ({
         updateOne: {
           filter: { _id: item.product },
-          update: { $inc: { stock: item.quantity } }
+          update: { 
+            $inc: { 
+              stock: item.quantity,
+              totalSold: -item.quantity // ক্যানসেল হলে totalSold কমিয়ে দেওয়া হলো
+            } 
+          }
         }
       })),
       { session }

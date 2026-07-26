@@ -8,30 +8,19 @@ import {
   addDiscountPercentageToProducts,
 } from "../utils/product";
 
-
 // ===============================
 // PARSE FORM DATA JSON
 // ===============================
-
-const parseJSON = (value:any)=>{
-
-  if(!value) return undefined;
-
-
-  if(typeof value === "string"){
-
-    try{
+const parseJSON = (value: any) => {
+  if (!value) return undefined;
+  if (typeof value === "string") {
+    try {
       return JSON.parse(value);
-    }
-    catch{
+    } catch {
       return value;
     }
-
   }
-
-
   return value;
-
 };
 
 // ===============================
@@ -62,70 +51,29 @@ export const createProduct = async (req: Request, res: Response): Promise<void> 
 
       images.push({ url: result.secure_url, public_id: result.public_id });
     }
-const productData:any = {
 
-  ...req.body,
+    const productData: any = {
+      ...req.body,
+      slug,
+      images,
+      isPublished: true,
+      isFeatured: req.body.isFeatured === "true",
+      isBestSeller: req.body.isBestSeller === "true",
+      isNewArrival: req.body.isNewArrival === "true",
+      isDeal: req.body.isDeal === "true",
+    };
 
-  slug,
+    // FIX ARRAYS
+    productData.specifications = parseJSON(req.body.specifications) || [];
+    productData.sizes = parseJSON(req.body.sizes) || [];
+    productData.colors = parseJSON(req.body.colors) || [];
 
-  images,
+    // FIX NUMBER
+    if (req.body.price) productData.price = Number(req.body.price);
+    if (req.body.discountPrice) productData.discountPrice = Number(req.body.discountPrice);
+    if (req.body.stock) productData.stock = Number(req.body.stock);
 
-  isPublished:true,
-
-  isFeatured:
-  req.body.isFeatured === "true",
-
-  isBestSeller:
-  req.body.isBestSeller === "true",
-
-  isNewArrival:
-  req.body.isNewArrival === "true",
-
-};
-
-
-
-// FIX ARRAYS
-
-productData.specifications =
-parseJSON(req.body.specifications)
-||
-[];
-
-
-productData.sizes =
-parseJSON(req.body.sizes)
-||
-[];
-
-
-productData.colors =
-parseJSON(req.body.colors)
-||
-[];
-
-
-
-// FIX NUMBER
-
-if(req.body.price)
-productData.price =
-Number(req.body.price);
-
-
-if(req.body.discountPrice)
-productData.discountPrice =
-Number(req.body.discountPrice);
-
-
-if(req.body.stock)
-productData.stock =
-Number(req.body.stock);
-
-
-
-const product =
-await Product.create(productData);
+    const product = await Product.create(productData);
 
     res.status(201).json({
       success: true,
@@ -194,8 +142,6 @@ export const getProducts = async (req: Request, res: Response): Promise<void> =>
     });
   }
 };
-
-
 
 // ===============================
 // GET PRODUCT BY ID
@@ -275,6 +221,8 @@ export const updateProduct = async (req: Request, res: Response): Promise<void> 
     if (req.body.isFeatured !== undefined) data.isFeatured = req.body.isFeatured === "true";
     if (req.body.isBestSeller !== undefined) data.isBestSeller = req.body.isBestSeller === "true";
     if (req.body.isNewArrival !== undefined) data.isNewArrival = req.body.isNewArrival === "true";
+    if (req.body.isDeal !== undefined) data.isDeal = req.body.isDeal === "true";
+    if (req.body.isPublished !== undefined) data.isPublished = req.body.isPublished === "true";
 
     const updatedProduct = await Product.findByIdAndUpdate(req.params.id, data, { new: true });
 
@@ -314,37 +262,149 @@ export const deleteProduct = async (req: Request, res: Response): Promise<void> 
 };
 
 // ===============================
-// ADDITIONAL PRODUCT GETTERS (FEATURED, BEST SELLER, NEW ARRIVAL, RELATED, STOCK, LOW STOCK)
+// ADDITIONAL PRODUCT GETTERS
 // ===============================
-export const getFeaturedProducts = async (req: Request, res: Response): Promise<void> => {
+export const getFeaturedProducts = async (
+  req: Request,
+  res: Response
+): Promise<void> => {
   try {
-    const products = await Product.find({ isFeatured: true, isPublished: true })
-      .populate("category").limit(10).sort({ createdAt: -1 });
-    res.status(200).json({ success: true, products: addDiscountPercentageToProducts(products) });
+    const products = await Product.find({
+      isFeatured: true,
+      isPublished: true,
+    })
+      .populate("category")
+      .sort({
+        createdAt: -1,
+      })
+      .limit(10);
+
+    res.status(200).json({
+      success: true,
+      products: addDiscountPercentageToProducts(products),
+    });
   } catch (error: any) {
-    res.status(500).json({ success: false, message: "Failed to get featured products", error: error.message });
+    res.status(500).json({
+      success: false,
+      message: "Failed to get featured products",
+      error: error.message,
+    });
   }
 };
 
-export const getBestSellerProducts = async (req: Request, res: Response): Promise<void> => {
+export const getBestSellerProducts = async (
+  req: Request,
+  res: Response
+): Promise<void> => {
   try {
-    const products = await Product.find({ isBestSeller: true, isPublished: true })
-      .populate("category").limit(10).sort({ createdAt: -1 });
-    res.status(200).json({ success: true, products: addDiscountPercentageToProducts(products) });
+    const products = await Product.find({
+      isPublished: true,
+      $or: [
+        { isBestSeller: true },
+        { totalSold: { $gt: 5 } }
+      ]
+    })
+      .populate("category")
+      .sort({
+        totalSold: -1,
+        createdAt: -1,
+      })
+      .limit(10);
+
+    res.status(200).json({
+      success: true,
+      products: addDiscountPercentageToProducts(products),
+    });
   } catch (error: any) {
-    res.status(500).json({ success: false, message: "Failed to fetch best seller products", error: error.message });
+    res.status(500).json({
+      success: false,
+      message: "Failed to fetch best seller products",
+      error: error.message,
+    });
   }
 };
 
-export const getNewArrivalProducts = async (req: Request, res: Response): Promise<void> => {
+export const getTopPickProducts = async (
+  req: Request,
+  res: Response
+): Promise<void> => {
   try {
-    const date = new Date();
-    date.setDate(date.getDate() - 60);
-    const products = await Product.find({ isPublished: true, createdAt: { $gte: date } })
-      .populate("category").sort({ createdAt: -1 }).limit(8);
-    res.status(200).json({ success: true, products: addDiscountPercentageToProducts(products) });
+    const products = await Product.find({
+      isPublished: true,
+      totalSold: { $gt: 0 }
+    })
+      .populate("category")
+      .sort({
+        totalSold: -1,
+      })
+      .limit(8);
+
+    res.status(200).json({
+      success: true,
+      products: addDiscountPercentageToProducts(products),
+    });
   } catch (error: any) {
-    res.status(500).json({ success: false, message: "Failed to fetch new arrivals", error: error.message });
+    res.status(500).json({
+      success: false,
+      message: "Failed to fetch top pick products",
+      error: error.message,
+    });
+  }
+};
+
+export const getNewArrivalProducts = async (
+  req: Request,
+  res: Response
+): Promise<void> => {
+  try {
+    const products = await Product.find({
+      isNewArrival: true,
+      isPublished: true,
+    })
+      .populate("category")
+      .sort({
+        createdAt: -1,
+      })
+      .limit(10);
+
+    res.status(200).json({
+      success: true,
+      products: addDiscountPercentageToProducts(products),
+    });
+  } catch (error: any) {
+    res.status(500).json({
+      success: false,
+      message: "Failed to fetch new arrivals",
+      error: error.message,
+    });
+  }
+};
+
+export const getDealProducts = async (
+  req: Request,
+  res: Response
+): Promise<void> => {
+  try {
+    const products = await Product.find({
+      isDeal: true,
+      isPublished: true,
+    })
+      .populate("category")
+      .sort({
+        createdAt: -1,
+      })
+      .limit(10);
+
+    res.status(200).json({
+      success: true,
+      products: addDiscountPercentageToProducts(products),
+    });
+  } catch (error: any) {
+    res.status(500).json({
+      success: false,
+      message: "Failed to fetch deal products",
+      error: error.message,
+    });
   }
 };
 
@@ -355,17 +415,35 @@ export const getRelatedProducts = async (req: Request, res: Response): Promise<v
       res.status(404).json({ success: false, message: "Product not found" });
       return;
     }
-    const products = await Product.find({ category: product.category, _id: { $ne: req.params.id }, isPublished: true })
-      .populate("category").limit(6).sort({ createdAt: -1 });
-    res.status(200).json({ success: true, products: addDiscountPercentageToProducts(products) });
+    const products = await Product.find({
+      category: product.category,
+      _id: { $ne: req.params.id },
+      isPublished: true,
+    })
+      .populate("category")
+      .sort({ createdAt: -1 })
+      .limit(6);
+
+    res.status(200).json({
+      success: true,
+      products: addDiscountPercentageToProducts(products),
+    });
   } catch (error: any) {
-    res.status(500).json({ success: false, message: "Failed to get related products", error: error.message });
+    res.status(500).json({
+      success: false,
+      message: "Failed to get related products",
+      error: error.message,
+    });
   }
 };
 
 export const updateStock = async (req: Request, res: Response): Promise<void> => {
   try {
-    const product = await Product.findByIdAndUpdate(req.params.id, { stock: Number(req.body.stock) }, { new: true });
+    const product = await Product.findByIdAndUpdate(
+      req.params.id,
+      { stock: Number(req.body.stock) },
+      { new: true }
+    );
     if (!product) {
       res.status(404).json({ success: false, message: "Product not found" });
       return;
@@ -376,15 +454,59 @@ export const updateStock = async (req: Request, res: Response): Promise<void> =>
       product: addDiscountPercentage(product),
     });
   } catch (error: any) {
-    res.status(500).json({ success: false, message: "Stock update failed", error: error.message });
+    res.status(500).json({
+      success: false,
+      message: "Stock update failed",
+      error: error.message,
+    });
   }
 };
 
 export const getLowStockProducts = async (req: Request, res: Response): Promise<void> => {
   try {
     const products = await Product.find({ stock: { $lte: 5 } }).populate("category");
-    res.status(200).json({ success: true, products: addDiscountPercentageToProducts(products) });
+    res.status(200).json({
+      success: true,
+      products: addDiscountPercentageToProducts(products),
+    });
   } catch (error: any) {
-    res.status(500).json({ success: false, message: "Failed to get low stock products", error: error.message });
+    res.status(500).json({
+      success: false,
+      message: "Failed to get low stock products",
+      error: error.message,
+    });
+  }
+};
+
+// ===============================
+// ADMIN UPDATE DEAL STATUS
+// ===============================
+export const updateDealStatus = async (
+  req: Request,
+  res: Response
+): Promise<void> => {
+  try {
+    const updatedProduct = await Product.findByIdAndUpdate(
+      req.params.id,
+      { isDeal: req.body.isDeal },
+      { new: true }
+    ).populate("category");
+
+    if (!updatedProduct) {
+      res.status(404).json({ success: false, message: "Product not found" });
+      return;
+    }
+
+    res.status(200).json({
+      success: true,
+      message: "Deal status updated successfully",
+      product: addDiscountPercentage(updatedProduct),
+    });
+  } catch (error: any) {
+    res.status(500).json({
+      success: false,
+      message: "Failed to update deal status",
+      error: error.message,
+    });
   }
 };

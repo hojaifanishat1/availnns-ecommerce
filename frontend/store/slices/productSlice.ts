@@ -5,30 +5,77 @@ import {
 
 import {
   getProducts,
+  getBestSellerProducts,
+  getNewArrivalProducts,
+  getDealProducts,
 } from "@/services/product.service";
 
 
-
 // ===============================
-// FETCH PRODUCTS
+// FETCH ALL PRODUCTS
 // ===============================
 
 export const fetchProducts = createAsyncThunk(
-
   "products/fetchProducts",
 
-  async()=>{
-
+  async () => {
     const data =
-    await getProducts();
-
+      await getProducts();
 
     return data;
-
   }
-
 );
 
+
+// ===============================
+// FETCH BEST SELLERS
+// ===============================
+
+export const fetchBestSellerProducts =
+  createAsyncThunk(
+    "products/fetchBestSellerProducts",
+
+    async () => {
+      const data =
+        await getBestSellerProducts();
+
+      return data;
+    }
+  );
+
+
+// ===============================
+// FETCH NEW ARRIVALS
+// ===============================
+
+export const fetchNewArrivalProducts =
+  createAsyncThunk(
+    "products/fetchNewArrivalProducts",
+
+    async () => {
+      const data =
+        await getNewArrivalProducts();
+
+      return data;
+    }
+  );
+
+
+// ===============================
+// FETCH DEAL PRODUCTS
+// ===============================
+
+export const fetchDealProducts =
+  createAsyncThunk(
+    "products/fetchDealProducts",
+
+    async () => {
+      const data =
+        await getDealProducts();
+
+      return data;
+    }
+  );
 
 
 // ===============================
@@ -36,32 +83,37 @@ export const fetchProducts = createAsyncThunk(
 // ===============================
 
 interface ProductState {
+  products: any[];
 
-  products:any[];
+  bestSellers: any[];
 
-  loading:boolean;
+  newArrivals: any[];
 
-  error:string | null;
+  deals: any[];
 
+  loading: boolean;
+
+  error: string | null;
 }
-
 
 
 // ===============================
 // INITIAL STATE
 // ===============================
 
-const initialState:ProductState = {
+const initialState: ProductState = {
+  products: [],
 
-  products:[],
+  bestSellers: [],
 
-  loading:false,
+  newArrivals: [],
 
-  error:null,
+  deals: [],
 
+  loading: false,
+
+  error: null,
 };
-
-
 
 
 // ===============================
@@ -69,83 +121,175 @@ const initialState:ProductState = {
 // ===============================
 
 const productSlice = createSlice({
-
-  name:"products",
+  name: "products",
 
   initialState,
 
+  reducers: {
+    clearProducts: (state) => {
+      state.products = [];
 
-  reducers:{
+      state.bestSellers = [];
 
+      state.newArrivals = [];
 
-    clearProducts:(state)=>{
+      state.deals = [];
 
-      state.products=[];
-
+      state.error = null;
     },
-
-
   },
 
-
-
-  extraReducers:(builder)=>{
-
-
+  extraReducers: (builder) => {
     builder
 
+      // =========================
+      // ALL PRODUCTS
+      // =========================
 
-    .addCase(
-      fetchProducts.pending,
+      .addCase(
+        fetchProducts.pending,
 
-      (state)=>{
+        (state) => {
+          state.loading = true;
 
-        state.loading=true;
+          state.error = null;
+        }
+      )
 
-        state.error=null;
+      .addCase(
+        fetchProducts.fulfilled,
 
-      })
+        (state, action: any) => {
+          state.loading = false;
 
+          state.products =
+            action.payload || [];
+        }
+      )
 
+      .addCase(
+        fetchProducts.rejected,
 
-    .addCase(
-      fetchProducts.fulfilled,
+        (state) => {
+          state.loading = false;
 
-      (state, action)=>{
-
-
-        state.loading=false;
-
-
-        state.products =
-        action.payload || [];
-
-
-      })
-
-
-
-    .addCase(
-      fetchProducts.rejected,
-
-      (state)=>{
-
-
-        state.loading=false;
-
-        state.error =
-        "Failed to load products";
+          state.error =
+            "Failed to load products";
+        }
+      )
 
 
-      });
+      // =========================
+      // BEST SELLERS
+      // =========================
+
+      .addCase(
+        fetchBestSellerProducts.pending,
+
+        (state) => {
+          state.loading = true;
+
+          state.error = null;
+        }
+      )
+
+      .addCase(
+        fetchBestSellerProducts.fulfilled,
+
+        (state, action: any) => {
+          state.loading = false;
+
+          state.bestSellers =
+            action.payload || [];
+        }
+      )
+
+      .addCase(
+        fetchBestSellerProducts.rejected,
+
+        (state) => {
+          state.loading = false;
+
+          state.error =
+            "Failed to load best seller products";
+        }
+      )
 
 
-  }
+      // =========================
+      // NEW ARRIVALS
+      // =========================
+
+      .addCase(
+        fetchNewArrivalProducts.pending,
+
+        (state) => {
+          state.loading = true;
+
+          state.error = null;
+        }
+      )
+
+      .addCase(
+        fetchNewArrivalProducts.fulfilled,
+
+        (state, action: any) => {
+          state.loading = false;
+
+          state.newArrivals =
+            action.payload || [];
+        }
+      )
+
+      .addCase(
+        fetchNewArrivalProducts.rejected,
+
+        (state) => {
+          state.loading = false;
+
+          state.error =
+            "Failed to load new arrival products";
+        }
+      )
 
 
+      // =========================
+      // DEAL PRODUCTS
+      // =========================
+
+      .addCase(
+        fetchDealProducts.pending,
+
+        (state) => {
+          state.loading = true;
+
+          state.error = null;
+        }
+      )
+
+      .addCase(
+        fetchDealProducts.fulfilled,
+
+        (state, action: any) => {
+          state.loading = false;
+
+          state.deals =
+            action.payload || [];
+        }
+      )
+
+      .addCase(
+        fetchDealProducts.rejected,
+
+        (state) => {
+          state.loading = false;
+
+          state.error =
+            "Failed to load deal products";
+        }
+      );
+  },
 });
-
-
 
 
 // ===============================
@@ -154,9 +298,7 @@ const productSlice = createSlice({
 
 export const {
   clearProducts,
-
 } = productSlice.actions;
-
 
 
 // ===============================

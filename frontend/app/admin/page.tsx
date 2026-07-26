@@ -14,7 +14,8 @@ import {
   Plus,
   ListOrdered,
   Tags,
-  Bell, // নোটিফিকেশন আইকন ইমপোর্ট করা হলো
+  Bell,
+  Zap, // Deal আইকন ইমপোর্ট করা হলো
 } from "lucide-react";
 
 import useAdminAuth from "@/hooks/useAdminAuth";
@@ -32,6 +33,7 @@ type Stats = {
   featuredProducts: number;
   bestSellerProducts: number;
   lowStockProducts: number;
+  dealProducts?: number; // Deal স্ট্যাটস টাইপ যোগ করা হলো
 };
 
 export default function AdminDashboardPage() {
@@ -81,6 +83,7 @@ export default function AdminDashboardPage() {
     { title: "Revenue", value: `$${stats.totalRevenue}`, icon: <DollarSign /> },
     { title: "Featured", value: stats.featuredProducts, icon: <Star /> },
     { title: "Best Sellers", value: stats.bestSellerProducts, icon: <Flame /> },
+    { title: "Deals", value: stats.dealProducts || 0, icon: <Zap /> }, // ডিল প্রোডাক্ট কার্ড যোগ করা হলো
     { title: "Low Stock", value: stats.lowStockProducts, icon: <AlertTriangle /> },
   ];
 
@@ -103,7 +106,6 @@ export default function AdminDashboardPage() {
         <Link href="/admin/categories" className="flex items-center gap-3 rounded-3xl border bg-white p-5 hover:shadow-lg">
           <Tags /> Categories
         </Link>
-        {/* নোটিফিকেশন পাঠানোর শর্টকাট বাটন */}
         <Link href="/admin/notifications" className="flex items-center gap-3 rounded-3xl border bg-white p-5 hover:shadow-lg text-blue-600 font-semibold">
           <Bell /> Notifications
         </Link>

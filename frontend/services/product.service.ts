@@ -55,6 +55,24 @@ export const getBestSellerProducts = async (): Promise<Product[]> => {
 
 
 // =========================
+// TOP PICKS
+// =========================
+
+
+export const getTopPickProducts = async (): Promise<Product[]> => {
+
+  const res = await api.get(
+    "/products/top-picks"
+  );
+
+  return res.data.products || [];
+
+};
+
+
+
+
+// =========================
 // NEW ARRIVALS
 // =========================
 
@@ -70,7 +88,19 @@ export const getNewArrivalProducts = async (): Promise<Product[]> => {
 
 };
 
+// =========================
+// DEAL PRODUCTS
+// =========================
 
+export const getDealProducts = async (): Promise<Product[]> => {
+
+  const res = await api.get(
+    "/products/deals"
+  );
+
+  return res.data.products || [];
+
+};
 
 
 // =========================
@@ -346,4 +376,28 @@ export const getCategoryProducts = async (
 
   return res.data.data;
 
+};
+
+// =========================
+// UPDATE DEAL STATUS
+// =========================
+
+export const updateDealStatus = async (
+  id: string,
+  isDeal: boolean,
+  token: string
+) => {
+  const res = await api.put(
+    `/products/${id}/deal`,
+    {
+      isDeal,
+    },
+    {
+      headers: {
+        Authorization: `Bearer ${token}`,
+      },
+    }
+  );
+
+  return res.data;
 };

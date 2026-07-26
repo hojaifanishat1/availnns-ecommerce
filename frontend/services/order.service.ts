@@ -221,3 +221,31 @@ return res.data;
 
 
 };
+
+
+
+
+
+
+// =========================
+// DELETE ORDER (ADMIN)
+// =========================
+
+export const deleteOrder = async(
+  id:string
+)=>{
+
+
+const res =
+await api.delete(
+
+`/admin/orders/${id}`
+
+);
+
+
+
+return res.data;
+
+
+};

@@ -59,6 +59,8 @@ export interface Product {
   isFeatured:boolean;
 
   isBestSeller:boolean;
+  
+  isDeal:boolean; // <-- Added isDeal here
 
   isPublished:boolean;
 

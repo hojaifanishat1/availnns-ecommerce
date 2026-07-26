@@ -14,6 +14,7 @@ import {
   getRelatedProducts,
   getNewArrivalProducts,
   getBestSellerProducts,
+  getTopPickProducts, // <-- টপ পিক সার্ভিস ইমপোর্ট করা হলো
 } from "@/services/product.service";
 
 import {
@@ -43,6 +44,9 @@ export default function ProductDetailsPage({
   const [bestSeller, setBestSeller] =
     useState<Product[]>([]);
 
+  const [topPicks, setTopPicks] =
+    useState<Product[]>([]); // <-- টপ পিক স্টেট
+
   const [loading, setLoading] =
     useState(true);
 
@@ -58,11 +62,13 @@ export default function ProductDetailsPage({
           relatedRes,
           newRes,
           bestRes,
+          topPickRes, // <-- টপ পিক ফেচ করা হলো
         ] = await Promise.all([
           getProductById(id),
           getRelatedProducts(id),
           getNewArrivalProducts(),
           getBestSellerProducts(),
+          getTopPickProducts(),
         ]);
 
         const currentProduct =
@@ -95,6 +101,15 @@ export default function ProductDetailsPage({
 
         setBestSeller(
           bestRes
+            .filter(
+              (item: Product) =>
+                item._id !== id
+            )
+            .slice(0, 4)
+        );
+
+        setTopPicks(
+          topPickRes
             .filter(
               (item: Product) =>
                 item._id !== id
@@ -188,6 +203,13 @@ export default function ProductDetailsPage({
           <ProductSection
             title="Related Products"
             products={related}
+          />
+        )}
+
+        {topPicks.length > 0 && (
+          <ProductSection
+            title="Top Picks For You"
+            products={topPicks}
           />
         )}
 
