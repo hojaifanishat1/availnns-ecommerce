@@ -2,8 +2,6 @@
 
 import { useEffect, useState } from "react";
 import { useRouter, usePathname } from "next/navigation";
-import AdminSidebar from "./AdminSidebar";
-import AdminHeader from "./AdminHeader";
 
 export default function AdminGuard({
   children,
@@ -64,13 +62,7 @@ export default function AdminGuard({
     );
   }
 
-  return (
-    <div className="min-h-screen bg-zinc-100 flex">
-      <AdminSidebar />
-      <div className="flex-1 lg:ml-72">
-        <AdminHeader />
-        <main className="p-4 sm:p-6 lg:p-8">{children}</main>
-      </div>
-    </div>
-  );
+  // গার্ড শুধু সিকিউরিটি চেক করে চিলড্রেন রেন্ডার করবে। 
+  // লেআউট এবং হেডার/সাইডবার অলরেডি AdminLayout এ হ্যান্ডেল করা হচ্ছে।
+  return <>{children}</>;
 }

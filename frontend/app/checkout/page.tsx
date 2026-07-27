@@ -10,6 +10,13 @@ import {
 } from "next/navigation";
 import {
   Loader2,
+  Truck,
+  Clock,
+  MapPin,
+  Zap,
+  CheckCircle,
+  XCircle,
+  Home,
 } from "lucide-react";
 import api from "@/services/api";
 import useCart from "@/hooks/useCart";
@@ -56,10 +63,17 @@ export default function CheckoutPage() {
     setZones
   ] = useState<any[]>([]);
 
-  const [
-    selectedZone,
-    setSelectedZone
-  ] = useState("");
+  // Saved Addresses State
+  const [savedAddresses, setSavedAddresses] = useState<any[]>([]);
+  const [selectedAddressId, setSelectedAddressId] = useState<string>("");
+  const [isUsingSavedAddress, setIsUsingSavedAddress] = useState<boolean>(false);
+
+  // জোন ও ডেলিভারি টাইপ স্টেট
+  const [matchedRegularZone, setMatchedRegularZone] = useState<any>(null);
+  const [matchedExpressZone, setMatchedExpressZone] = useState<any>(null);
+  const [expressAvailable, setExpressAvailable] = useState<boolean>(false);
+  const [deliveryType, setDeliveryType] = useState<"regular" | "express">("regular");
+  const [selectedZone, setSelectedZone] = useState("");
 
   const [
     error,
@@ -86,10 +100,10 @@ export default function CheckoutPage() {
   });
 
   // =====================
-  // LOAD USER
+  // LOAD USER & SAVED ADDRESSES
   // =====================
   useEffect(() => {
-    const loadUser = async () => {
+    const loadUserAndAddresses = async () => {
       try {
         const token = localStorage.getItem("token");
 
@@ -100,6 +114,24 @@ export default function CheckoutPage() {
 
         const res = await api.get("/users/me");
         setUser(res.data.user);
+
+        // Load saved addresses from localStorage or user profile
+        const localData = localStorage.getItem("user_addresses");
+        if (localData) {
+          try {
+            const parsed = JSON.parse(localData);
+            if (Array.isArray(parsed) && parsed.length > 0) {
+              setSavedAddresses(parsed);
+              const savedId = localStorage.getItem("selected_address_id");
+              const defaultAddr = parsed.find((a) => a.id === savedId) || parsed.find((a) => a.isDefault) || parsed[0];
+              if (defaultAddr) {
+                handleSelectSavedAddress(defaultAddr, zones);
+              }
+            }
+          } catch (e) {
+            console.error("Error parsing saved addresses", e);
+          }
+        }
       } catch (error) {
         console.log("USER ERROR", error);
         router.replace("/login?redirect=/login");
@@ -108,7 +140,7 @@ export default function CheckoutPage() {
       }
     };
 
-    loadUser();
+    loadUserAndAddresses();
   }, [router]);
 
   // =====================
@@ -118,9 +150,11 @@ export default function CheckoutPage() {
     const loadZones = async () => {
       try {
         const data = await getDeliveryZones();
-        setZones(
-          data.filter((z: any) => z.active)
-        );
+        const activeZones = data.filter((z: any) => z.active);
+        setZones(activeZones);
+        if (!isUsingSavedAddress) {
+          processZonesAndLocation(form.location, activeZones);
+        }
       } catch (error) {
         console.log("ZONE ERROR", error);
       }
@@ -143,6 +177,81 @@ export default function CheckoutPage() {
   }, [user]);
 
   // =====================
+  // SELECT SAVED ADDRESS HANDLER
+  // =====================
+  const handleSelectSavedAddress = (addr: any, allZones = zones) => {
+    setSelectedAddressId(addr.id);
+    setIsUsingSavedAddress(true); // Mark that user chose a saved address
+    localStorage.setItem("selected_address_id", addr.id);
+
+    const updatedLocation = {
+      formattedAddress: addr.street || addr.location?.formattedAddress || "",
+      division: addr.division || "",
+      district: addr.city || addr.district || "",
+      area: addr.area || "",
+      road: addr.road || "",
+      latitude: addr.latitude || addr.location?.latitude || "saved_lat_dummy", // bypass map validation if saved
+      longitude: addr.longitude || addr.location?.longitude || "saved_lng_dummy",
+      googleMapLink: addr.googleMapLink || "",
+    };
+
+    setForm(prev => ({
+      ...prev,
+      name: addr.fullName || prev.name,
+      phone: addr.phone || prev.phone,
+      location: updatedLocation,
+    }));
+
+    processZonesAndLocation(updatedLocation, allZones);
+  };
+
+  // =====================
+  // PROCESS ZONES BASED ON LOCATION
+  // =====================
+  const processZonesAndLocation = (loc: any, allZones: any[]) => {
+    if (!allZones || allZones.length === 0) return;
+
+    const district = (loc.district || "").toLowerCase();
+    const area = (loc.area || loc.formattedAddress || "").toLowerCase();
+
+    // 1. Regular Zone Matching
+    const foundRegular = allZones.find((zone) => {
+      const zName = zone.name.toLowerCase();
+      const isExpress = zName.includes("3 hours") || zName.includes("[3 hours]");
+      if (isExpress) return false;
+      return zName.includes(district) || (area && zName.includes(area));
+    });
+
+    const finalRegular = foundRegular || allZones.find(z => !z.name.toLowerCase().includes("3 hours")) || allZones[0];
+    setMatchedRegularZone(finalRegular);
+
+    // 2. Express Zone Matching (3 hours)
+    const foundExpress = allZones.find((zone) => {
+      const zName = zone.name.toLowerCase();
+      const isExpress = zName.includes("3 hours") || zName.includes("[3 hours]");
+      if (!isExpress) return false;
+      return zName.includes(district) || (area && zName.includes(area));
+    });
+
+    if (foundExpress) {
+      setExpressAvailable(true);
+      setMatchedExpressZone(foundExpress);
+    } else {
+      setExpressAvailable(false);
+      setMatchedExpressZone(null);
+      if (deliveryType === "express") {
+        setDeliveryType("regular");
+      }
+    }
+
+    // Default selected zone ID
+    const activeSelectedZone = (deliveryType === "express" && foundExpress) ? foundExpress._id : finalRegular?._id;
+    if (activeSelectedZone) {
+      setSelectedZone(activeSelectedZone);
+    }
+  };
+
+  // =====================
   // INPUT CHANGE
   // =====================
   const handleChange = (
@@ -158,10 +267,28 @@ export default function CheckoutPage() {
   // LOCATION UPDATE
   // =====================
   const setLocation = (data: any) => {
-    setForm(prev => ({
-      ...prev,
-      location: data
-    }));
+    setIsUsingSavedAddress(false); // If user picks manually from map, disable saved address flag
+    setSelectedAddressId("");
+    setForm(prev => {
+      const updatedLoc = data;
+      processZonesAndLocation(updatedLoc, zones);
+      return {
+        ...prev,
+        location: updatedLoc
+      };
+    });
+  };
+
+  // =====================
+  // DELIVERY TYPE SWITCH
+  // =====================
+  const handleDeliveryTypeChange = (type: "regular" | "express") => {
+    setDeliveryType(type);
+    if (type === "express" && matchedExpressZone) {
+      setSelectedZone(matchedExpressZone._id);
+    } else if (matchedRegularZone) {
+      setSelectedZone(matchedRegularZone._id);
+    }
   };
 
   // =====================
@@ -180,8 +307,9 @@ export default function CheckoutPage() {
       return;
     }
 
-    if (!form.location.latitude || !form.location.longitude) {
-      setError("Please select map location");
+    // Map location check is optional if user selects a saved address
+    if (!isUsingSavedAddress && (!form.location.latitude || !form.location.longitude)) {
+      setError("Please select map location or choose a saved address");
       return;
     }
 
@@ -195,7 +323,8 @@ export default function CheckoutPage() {
       "checkoutData",
       JSON.stringify({
         ...form,
-        deliveryZone: selectedZone
+        deliveryZone: selectedZone,
+        deliveryType
       })
     );
 
@@ -219,6 +348,35 @@ export default function CheckoutPage() {
         <div className="mt-8 grid gap-8 lg:grid-cols-3">
           {/* LEFT */}
           <div className="space-y-6 lg:col-span-2">
+            
+            {/* SAVED ADDRESSES SECTION */}
+            {savedAddresses.length > 0 && (
+              <div className="rounded-3xl border bg-white p-6 shadow-sm space-y-4">
+                <h2 className="text-lg font-black flex items-center gap-2">
+                  <Home size={18} /> Select from Saved Addresses
+                </h2>
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                  {savedAddresses.map((addr) => (
+                    <div
+                      key={addr.id}
+                      onClick={() => handleSelectSavedAddress(addr)}
+                      className={`p-4 rounded-2xl border cursor-pointer transition flex flex-col justify-between gap-2 ${
+                        selectedAddressId === addr.id
+                          ? "border-black bg-black/5 ring-1 ring-black"
+                          : "border-zinc-200 hover:border-zinc-300"
+                      }`}
+                    >
+                      <div>
+                        <p className="font-bold text-xs text-zinc-900">{addr.title || "Saved Address"}</p>
+                        <p className="text-xs text-zinc-600 mt-1 line-clamp-2">{addr.city}, {addr.street || addr.location?.formattedAddress}</p>
+                      </div>
+                      <span className="text-[10px] font-semibold text-zinc-500">📞 {addr.phone}</span>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
+
             {/* SHIPPING */}
             <ShippingForm
               form={form}
@@ -231,30 +389,85 @@ export default function CheckoutPage() {
               setLocation={setLocation}
             />
 
-            {/* DELIVERY AREA */}
-            <div className="rounded-3xl border bg-white p-6 shadow-sm">
-              <h2 className="mb-4 text-xl font-black">
-                Delivery Area
+            {/* DELIVERY AREA - 2 Box Design (Regular & Express) */}
+            <div className="rounded-3xl border bg-white p-6 shadow-sm space-y-4">
+              <h2 className="text-xl font-black flex items-center gap-2">
+                <Truck size={20} /> Choose Delivery Method
               </h2>
 
-              <select
-                value={selectedZone}
-                onChange={(e) => setSelectedZone(e.target.value)}
-                className="w-full rounded-xl border p-4 outline-none"
-              >
-                <option value="">
-                  Select delivery area
-                </option>
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                
+                {/* Regular Delivery Box */}
+                <div
+                  onClick={() => handleDeliveryTypeChange("regular")}
+                  className={`p-4 rounded-2xl border cursor-pointer transition flex flex-col justify-between gap-3 ${
+                    deliveryType === "regular"
+                      ? "border-black bg-black/5 ring-1 ring-black"
+                      : "border-zinc-200 hover:border-zinc-300"
+                  }`}
+                >
+                  <div className="flex items-center justify-between">
+                    <span className="font-bold text-sm text-zinc-900 flex items-center gap-1.5">
+                      <Truck size={16} className="text-blue-600" /> Regular Delivery
+                    </span>
+                    <span className="text-[10px] bg-blue-50 text-blue-700 font-semibold px-2 py-0.5 rounded-md">
+                      Available
+                    </span>
+                  </div>
+                  <div className="text-xs text-zinc-600 space-y-1">
+                    <p className="flex items-center gap-1">
+                      <Clock size={13} className="text-zinc-400" /> Time: <strong className="text-zinc-900">{matchedRegularZone?.estimatedDays || "3-5 Days"}</strong>
+                    </p>
+                    <p className="flex items-center gap-1">
+                      <MapPin size={13} className="text-zinc-400" /> Fee: <strong className="text-zinc-900">{formatPrice(matchedRegularZone?.deliveryFee || 60)}</strong>
+                    </p>
+                  </div>
+                </div>
 
-                {zones.map((zone: any) => (
-                  <option
-                    key={zone._id}
-                    value={zone._id}
-                  >
-                    {zone.name} - {formatPrice(zone.deliveryFee)}
-                  </option>
-                ))}
-              </select>
+                {/* Express Delivery Box */}
+                <div
+                  onClick={() => expressAvailable && handleDeliveryTypeChange("express")}
+                  className={`p-4 rounded-2xl border transition flex flex-col justify-between gap-3 ${
+                    !expressAvailable 
+                      ? "opacity-60 bg-zinc-50 border-zinc-200 cursor-not-allowed" 
+                      : deliveryType === "express"
+                      ? "border-purple-600 bg-purple-50/30 ring-1 ring-purple-600 cursor-pointer"
+                      : "border-zinc-200 hover:border-zinc-300 cursor-pointer"
+                  }`}
+                >
+                  <div className="flex items-center justify-between">
+                    <span className="font-bold text-sm text-zinc-900 flex items-center gap-1.5">
+                      <Zap size={16} className="text-purple-600" /> Express (3 Hours)
+                    </span>
+                    {expressAvailable ? (
+                      <span className="text-[10px] bg-purple-100 text-purple-700 font-bold px-2 py-0.5 rounded-md flex items-center gap-0.5">
+                        <CheckCircle size={11} /> Available
+                      </span>
+                    ) : (
+                      <span className="text-[10px] bg-zinc-200 text-zinc-600 font-medium px-2 py-0.5 rounded-md flex items-center gap-0.5">
+                        <XCircle size={11} /> Not Available
+                      </span>
+                    )}
+                  </div>
+                  <div className="text-xs text-zinc-600 space-y-1">
+                    {expressAvailable ? (
+                      <>
+                        <p className="flex items-center gap-1">
+                          <Clock size={13} className="text-purple-500" /> Time: <strong className="text-zinc-900">{matchedExpressZone?.estimatedDays || "Within 3 Hours"}</strong>
+                        </p>
+                        <p className="flex items-center gap-1">
+                          <MapPin size={13} className="text-purple-500" /> Fee: <strong className="text-zinc-900">{formatPrice(matchedExpressZone?.deliveryFee || 100)}</strong>
+                        </p>
+                      </>
+                    ) : (
+                      <p className="text-xs text-zinc-400 italic py-2">
+                        আপনার লোকেশনে এক্সপ্রেস ডেলিভারি সমর্থিত নয়।
+                      </p>
+                    )}
+                  </div>
+                </div>
+
+              </div>
             </div>
 
             {/* ERROR */}

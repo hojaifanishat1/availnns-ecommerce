@@ -3,8 +3,9 @@
 import {
   User,
   Phone,
-  MapPin,
+  Pencil,
 } from "lucide-react";
+import { useState } from "react";
 
 interface Props {
   form: any;
@@ -12,6 +13,8 @@ interface Props {
 }
 
 export default function ShippingForm({ form, handleChange }: Props) {
+  const [isEditingPhone, setIsEditingPhone] = useState(false);
+
   return (
     <div className="rounded-3xl border bg-white p-6 shadow-sm">
       <div className="mb-6 flex items-center gap-3">
@@ -50,45 +53,38 @@ export default function ShippingForm({ form, handleChange }: Props) {
           <label className="mb-2 block text-sm font-semibold">
             Bangladesh Phone Number
           </label>
-          <div className="relative">
-            <Phone
-              size={18}
-              className="absolute left-4 top-4 text-zinc-400"
-            />
-            <input
-              name="phone"
-              value={form.phone}
-              onChange={handleChange}
-              placeholder="017XXXXXXXX"
-              className="w-full rounded-xl border py-3 pl-12 pr-4 outline-none focus:border-black"
-              required
-            />
+          <div className="relative flex items-center gap-2">
+            <div className="relative w-full">
+              <Phone
+                size={18}
+                className="absolute left-4 top-4 text-zinc-400"
+              />
+              <input
+                name="phone"
+                value={form.phone}
+                onChange={handleChange}
+                disabled={!isEditingPhone}
+                placeholder="017XXXXXXXX"
+                className={`w-full rounded-xl border py-3 pl-12 pr-4 outline-none transition ${
+                  isEditingPhone
+                    ? "border-black bg-white focus:border-black"
+                    : "border-zinc-200 bg-zinc-100 text-zinc-700"
+                }`}
+                required
+              />
+            </div>
+            <button
+              type="button"
+              onClick={() => setIsEditingPhone(!isEditingPhone)}
+              className="flex items-center gap-1.5 shrink-0 px-4 py-3 rounded-xl bg-blue-50 text-blue-600 hover:bg-blue-100 font-bold text-xs transition border border-blue-100 cursor-pointer"
+            >
+              <Pencil size={14} />
+              {isEditingPhone ? "Save" : "Change"}
+            </button>
           </div>
           <p className="mt-2 text-xs text-zinc-500">
             Example: 01712345678
           </p>
-        </div>
-
-        {/* ADDRESS */}
-        <div>
-          <label className="mb-2 block text-sm font-semibold">
-            House / Full Address
-          </label>
-          <div className="relative">
-            <MapPin
-              size={18}
-              className="absolute left-4 top-4 text-zinc-400"
-            />
-            <textarea
-              name="address"
-              value={form.address}
-              onChange={(e) => handleChange(e as any)}
-              rows={4}
-              placeholder="House number, building, floor etc."
-              className="w-full rounded-xl border py-3 pl-12 pr-4 outline-none focus:border-black"
-              required
-            />
-          </div>
         </div>
 
         {/* COUNTRY */}

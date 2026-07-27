@@ -74,7 +74,6 @@ export default function AddressPage() {
 
   // 1. Load Saved Addresses from LocalStorage & User Info from API
   useEffect(() => {
-    // LocalStorage থেকে সেভ হওয়া অ্যাড্রেস লোড করা
     const localData = localStorage.getItem("user_addresses");
     if (localData) {
       try {
@@ -84,7 +83,6 @@ export default function AddressPage() {
       }
     }
 
-    // User Profile Auto-fill-এর জন্য
     const loadUser = async () => {
       try {
         const userRes = await api.get("/users/me");
@@ -92,20 +90,18 @@ export default function AddressPage() {
           setUser(userRes.data.user);
         }
       } catch (error) {
-        // 404 বা অন্য এরর আসলে শান্তভাবে ইগনোর করবে
         console.log("User endpoint not found, using manual inputs.");
       }
     };
     loadUser();
   }, []);
 
-  // 2. LocalStorage sync helper
   const saveToLocalStorage = (data: Address[]) => {
     setAddresses(data);
     localStorage.setItem("user_addresses", JSON.stringify(data));
   };
 
-  // Open Modal
+  // Open Modal & Auto-fill User's Saved Name and Phone (Read-Only)
   const handleOpenModal = (address?: Address) => {
     if (address) {
       setEditingId(address.id);
@@ -139,7 +135,6 @@ export default function AddressPage() {
     setIsOpenModal(true);
   };
 
-  // Location Setter
   const setLocation = (data: any) => {
     setFormData((prev) => ({
       ...prev,
@@ -150,7 +145,6 @@ export default function AddressPage() {
     }));
   };
 
-  // Set Default Address
   const handleSetDefault = (id: string) => {
     const updated = addresses.map((addr) => ({
       ...addr,
@@ -159,7 +153,6 @@ export default function AddressPage() {
     saveToLocalStorage(updated);
   };
 
-  // Delete Address
   const handleDelete = (id: string) => {
     if (confirm("Are you sure you want to delete this address?")) {
       const updated = addresses.filter((a) => a.id !== id);
@@ -167,7 +160,6 @@ export default function AddressPage() {
     }
   };
 
-  // Save Address (Create / Edit)
   const handleSave = (e: React.FormEvent) => {
     e.preventDefault();
 
@@ -348,32 +340,29 @@ export default function AddressPage() {
               </div>
 
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                {/* NAME FIELD (READ-ONLY) */}
                 <div>
                   <label className="text-xs font-semibold text-slate-700 mb-1 block">
                     Full Name
                   </label>
                   <input
-                    required
+                    readOnly
                     value={formData.name}
-                    onChange={(e) =>
-                      setFormData({ ...formData, name: e.target.value })
-                    }
                     placeholder="Full Name"
-                    className="w-full border border-slate-200 rounded-xl px-3.5 py-2 text-xs text-slate-800 bg-white focus:outline-none focus:border-slate-900"
+                    className="w-full border border-slate-200 rounded-xl px-3.5 py-2 text-xs text-slate-700 bg-slate-100 outline-none cursor-not-allowed"
                   />
                 </div>
+                
+                {/* PHONE NUMBER FIELD (READ-ONLY) */}
                 <div>
                   <label className="text-xs font-semibold text-slate-700 mb-1 block">
                     Phone Number
                   </label>
                   <input
-                    required
+                    readOnly
                     value={formData.phone}
-                    onChange={(e) =>
-                      setFormData({ ...formData, phone: e.target.value })
-                    }
                     placeholder="017XXXXXXXX"
-                    className="w-full border border-slate-200 rounded-xl px-3.5 py-2 text-xs text-slate-800 bg-white focus:outline-none focus:border-slate-900"
+                    className="w-full border border-slate-200 rounded-xl px-3.5 py-2 text-xs text-slate-700 bg-slate-100 outline-none cursor-not-allowed"
                   />
                 </div>
               </div>
