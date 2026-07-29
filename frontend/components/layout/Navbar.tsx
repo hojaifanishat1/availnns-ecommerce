@@ -8,9 +8,6 @@ import {
   ShoppingCart,
   User,
   Heart,
-  Home,
-  ShoppingBag,
-  Grid2X2,
 } from "lucide-react";
 
 // Components
@@ -31,7 +28,7 @@ export default function Navbar() {
 
   const { totalItems } = useCart();
   const { wishlist } = useWishlist();
-  const wishlistCount = wishlist.length;
+  const wishlistCount = wishlist?.length || 0;
 
   const { user } = useAuth();
   const pathname = usePathname();
@@ -45,96 +42,104 @@ export default function Navbar() {
 
   return (
     <>
-      <header className="sticky top-0 z-50 bg-white border-b border-zinc-200 shadow-sm">
-        <div className="max-w-7xl mx-auto px-6 py-4 flex items-center justify-between gap-5">
-          {/* Mobile Menu */}
+      {/* 
+        'fixed inset-x-0 top-0 z-50' নিশ্চিত করবে যে Navbar পেজের একদম উপরে স্ক্রিন জুড়ে ফিক্সড থাকবে।
+      */}
+      <header className="fixed inset-x-0 top-0 z-50 bg-white/95 backdrop-blur-md border-b border-zinc-100 shadow-xs transition-all">
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 py-3.5 flex items-center justify-between gap-4 md:gap-8">
+          
+          {/* Mobile Menu Trigger Button */}
           <button
             onClick={() => setMobileMenuOpen(true)}
-            className="md:hidden text-zinc-600 hover:text-black transition"
+            className="md:hidden text-zinc-700 hover:text-black transition p-1 cursor-pointer"
+            aria-label="Open Menu"
           >
-            <Menu size={25} />
+            <Menu size={24} />
           </button>
 
-          {/* Logo */}
-          <Link href="/" className="text-2xl font-black tracking-wide">
-            NOPTRIX
+          {/* Brand Logo */}
+          <Link href="/" className="text-xl sm:text-2xl font-black tracking-wider text-zinc-900">
+            NOPTRIX<span className="text-rose-600">.</span>
           </Link>
 
-          {/* Search */}
+          {/* Desktop Search Bar */}
           <div className="hidden md:flex flex-1 max-w-xl">
             <SearchBar />
           </div>
 
-          {/* Actions */}
-          <div className="flex items-center gap-5">
-            {/* Wishlist */}
+          {/* Header Action Icons */}
+          <div className="flex items-center gap-4 sm:gap-5">
+            {/* Wishlist Link */}
             <Link
               href="/wishlist"
-              className="relative text-zinc-600 hover:text-red-500 transition group p-1"
+              className="relative text-zinc-600 hover:text-rose-600 transition group p-1.5"
+              aria-label="Wishlist"
             >
-              <Heart size={23} className="transition-transform duration-300 group-hover:scale-110" />
+              <Heart size={22} className="transition-transform duration-300 group-hover:scale-110" />
               {wishlistCount > 0 && (
-                <span className="absolute -top-1 -right-1 bg-red-500 text-white text-[10px] w-5 h-5 rounded-full flex items-center justify-center font-bold shadow-sm">
+                <span className="absolute -top-0.5 -right-0.5 bg-rose-600 text-white text-[10px] w-4.5 h-4.5 rounded-full flex items-center justify-center font-bold shadow-xs">
                   {wishlistCount > 99 ? "99+" : wishlistCount}
                 </span>
               )}
             </Link>
 
-            {/* Cart */}
+            {/* Cart Drawer Trigger */}
             <button
               onClick={() => setCartOpen(true)}
-              className="relative text-zinc-600 hover:text-black transition group p-1"
+              className="relative text-zinc-600 hover:text-black transition group p-1.5 cursor-pointer"
+              aria-label="Shopping Cart"
             >
-              <ShoppingCart size={23} className="transition-transform duration-300 group-hover:scale-110" />
+              <ShoppingCart size={22} className="transition-transform duration-300 group-hover:scale-110" />
               {totalItems > 0 && (
-                <span className="absolute -top-1 -right-1 bg-black text-white text-[10px] w-5 h-5 rounded-full flex items-center justify-center font-bold shadow-sm">
+                <span className="absolute -top-0.5 -right-0.5 bg-zinc-900 text-white text-[10px] w-4.5 h-4.5 rounded-full flex items-center justify-center font-bold shadow-xs">
                   {totalItems > 99 ? "99+" : totalItems}
                 </span>
               )}
             </button>
 
-            {/* Account / User Profile Picture */}
+            {/* User Account / Profile */}
             {user ? (
               <Link
                 href="/dashboard"
-                className="flex items-center gap-2 border-l border-zinc-200 pl-5 text-zinc-700 hover:text-black transition group"
+                className="hidden sm:flex items-center gap-2 border-l border-zinc-200 pl-4 text-zinc-700 hover:text-black transition group"
               >
-                {user.avatar ? (
+                {user?.avatar ? (
                   <img
                     src={user.avatar}
-                    alt={user.name || "User"}
-                    className="w-8 h-8 rounded-full object-cover border border-zinc-300 group-hover:scale-105 transition-transform"
+                    alt={user?.name || "User Profile"}
+                    className="w-8 h-8 rounded-full object-cover border border-zinc-200 group-hover:scale-105 transition-transform"
                   />
                 ) : (
                   <div className="w-8 h-8 rounded-full bg-zinc-100 flex items-center justify-center text-zinc-700 group-hover:scale-105 transition-transform">
-                    <User size={18} />
+                    <User size={16} />
                   </div>
                 )}
-                <span className="hidden sm:block font-semibold text-sm">
-                  {user.name}
+                <span className="font-semibold text-sm truncate max-w-[100px]">
+                  {user?.name?.split(" ")[0]}
                 </span>
               </Link>
             ) : (
               <Link
                 href="/login"
-                className="text-zinc-600 hover:text-black transition group p-1"
+                className="text-zinc-600 hover:text-black transition group p-1.5"
+                aria-label="Login"
               >
-                <User size={23} className="transition-transform duration-300 group-hover:scale-110" />
+                <User size={22} className="transition-transform duration-300 group-hover:scale-110" />
               </Link>
             )}
           </div>
         </div>
 
-        {/* Mobile Search */}
-        <div className="md:hidden border-t border-zinc-100 px-6 py-3">
+        {/* Mobile Search Bar Section */}
+        <div className="md:hidden border-t border-zinc-100 px-4 py-2.5 bg-zinc-50/50">
           <SearchBar />
         </div>
       </header>
 
-      {/* Cart Drawer */}
+      {/* Cart Drawer Component */}
       <CartDrawer open={cartOpen} onClose={() => setCartOpen(false)} />
 
-      {/* Mobile Menu */}
+      {/* Mobile Menu Component */}
       <MobileMenu
         open={mobileMenuOpen}
         onClose={() => setMobileMenuOpen(false)}

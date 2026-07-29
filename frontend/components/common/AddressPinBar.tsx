@@ -36,6 +36,28 @@ export default function AddressPinBar() {
   const [hasExpressAvailable, setHasExpressAvailable] = useState(false);
   const [isOpen, setIsOpen] = useState(false);
 
+  // Scroll direction state for hide/show effect
+  const [isVisible, setIsVisible] = useState(true);
+  const [lastScrollY, setLastScrollY] = useState(0);
+
+  useEffect(() => {
+    const handleScroll = () => {
+      const currentScrollY = window.scrollY;
+
+      if (currentScrollY > lastScrollY && currentScrollY > 50) {
+        setIsVisible(false);
+        setIsOpen(false);
+      } else {
+        setIsVisible(true);
+      }
+
+      setLastScrollY(currentScrollY);
+    };
+
+    window.addEventListener("scroll", handleScroll, { passive: true });
+    return () => window.removeEventListener("scroll", handleScroll);
+  }, [lastScrollY]);
+
   const loadAddresses = (zones: any[]) => {
     const localData = localStorage.getItem("user_addresses");
     if (localData) {
@@ -126,7 +148,27 @@ export default function AddressPinBar() {
   };
 
   return (
-    <div className="bg-gray-50 border-b border-gray-200 py-2 px-4 sm:px-8 relative z-40">
+    <div
+      className={`
+        fixed 
+        inset-x-0 
+        top-[57px] 
+        sm:top-[65px] 
+        z-40 
+        bg-gray-50/95 
+        backdrop-blur-md
+        border-b 
+        border-gray-200 
+        py-2 
+        px-4 
+        sm:px-8 
+        shadow-xs 
+        transition-transform 
+        duration-300 
+        ease-in-out
+        ${isVisible ? "translate-y-0" : "-translate-y-full"}
+      `}
+    >
       <div className="max-w-7xl mx-auto flex items-center justify-between text-xs sm:text-sm">
         
         <div className="flex items-center gap-2">

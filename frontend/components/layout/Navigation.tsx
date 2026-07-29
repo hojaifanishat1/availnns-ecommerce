@@ -74,22 +74,22 @@ export default function Navigation() {
     return pathname === href || pathname.startsWith(`${href}/`);
   };
 
-  const renderIcon = (icon?: string) => {
+  const renderIcon = (icon?: string, active?: boolean) => {
     switch (icon) {
       case "home":
-        return <Home size={16} className="text-blue-500" />;
+        return <Home size={22} className={active ? "text-white" : "text-blue-500"} />;
       case "shop":
-        return <ShoppingBag size={16} className="text-indigo-500" />;
+        return <ShoppingBag size={22} className={active ? "text-white" : "text-indigo-500"} />;
       case "category":
-        return <Grid2X2 size={16} className="text-emerald-500" />;
+        return <Grid2X2 size={22} className={active ? "text-white" : "text-emerald-500"} />;
       case "flame":
-        return <Flame size={16} className="text-amber-500" />;
+        return <Flame size={22} className={active ? "text-white" : "text-amber-500"} />;
       case "sparkles":
-        return <Sparkles size={16} className="text-purple-500" />;
+        return <Sparkles size={22} className={active ? "text-white" : "text-purple-500"} />;
       case "tag":
-        return <Tag size={16} className="text-rose-500" />;
+        return <Tag size={22} className={active ? "text-white" : "text-rose-500"} />;
       case "phone":
-        return <Phone size={16} className="text-sky-500" />;
+        return <Phone size={22} className={active ? "text-white" : "text-sky-500"} />;
       default:
         return null;
     }
@@ -98,29 +98,33 @@ export default function Navigation() {
   return (
     <nav
       className="
-      sticky
-      top-0
-      z-40
-      border-b
+      fixed
+      inset-x-0
+      bottom-0
+      z-50
+      border-t
       border-zinc-200
       bg-white/95
       backdrop-blur-md
+      shadow-2xl
+      py-2
       "
     >
       <div
         className="
         mx-auto
         max-w-7xl
-        px-6
+        px-4
         "
       >
         <ul
           className="
           flex
           items-center
+          justify-around
           gap-2
           overflow-x-auto
-          py-3
+          py-1
           whitespace-nowrap
           scrollbar-hide
           "
@@ -139,69 +143,56 @@ export default function Navigation() {
                     relative
                     group
                     flex
+                    flex-col
                     items-center
-                    gap-2
-                    rounded-full
+                    justify-center
+                    gap-1.5
+                    rounded-2xl
                     px-4
                     py-2.5
-                    text-sm
-                    font-semibold
+                    min-w-[70px]
+                    text-xs
+                    font-bold
                     transition-all
                     duration-300
+                    cursor-pointer
 
                     ${
                       active
-                        ? "bg-black text-white shadow-md"
+                        ? "bg-zinc-900 text-white shadow-lg scale-105"
                         : "text-zinc-600 hover:bg-zinc-100 hover:text-black"
                     }
                   `}
                 >
                   {/* Icon */}
-                  <span className={`transition-transform duration-300 group-hover:scale-110 ${active ? "text-white" : ""}`}>
-                    {renderIcon(item.icon)}
+                  <span className="transition-transform duration-300 group-hover:scale-110">
+                    {renderIcon(item.icon, active)}
                   </span>
 
                   {/* Name */}
-                  <span>{item.name}</span>
+                  <span className="text-[11px] tracking-wide">{item.name}</span>
 
                   {/* Optional Badge */}
                   {item.badge && (
                     <span
                       className={`
-                        text-[10px]
-                        font-bold
+                        absolute
+                        -top-1
+                        right-1
+                        text-[9px]
+                        font-extrabold
                         px-1.5
                         py-0.5
                         rounded-full
                         tracking-wider
                         uppercase
+                        shadow-sm
                         ${item.badgeColor}
                       `}
                     >
                       {item.badge}
                     </span>
                   )}
-
-                  {/* Bottom Indicator Line */}
-                  <span
-                    className={`
-                      absolute
-                      left-1/2
-                      -bottom-[13px]
-                      h-[3px]
-                      -translate-x-1/2
-                      rounded-full
-                      bg-black
-                      transition-all
-                      duration-300
-
-                      ${
-                        active
-                          ? "w-8 opacity-100"
-                          : "w-0 opacity-0"
-                      }
-                    `}
-                  />
                 </Link>
               </li>
             );

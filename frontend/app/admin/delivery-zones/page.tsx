@@ -91,7 +91,8 @@ export default function DeliveryZonesPage() {
 
     expressSubArea: "",                   
     deliveryFee: 0,
-    minOrderAmount: 0, // <-- মিনিমাম অর্ডার অ্যামাউন্ট যোগ করা হলো
+    minOrderAmount: 0, 
+    isFreeShipping: false, // <-- ফ্রি শিপিং অপশন (Free Toggle)
     estimatedDays: "2-3 Days",
     active: true,
   });
@@ -264,8 +265,9 @@ export default function DeliveryZonesPage() {
 
       const payload = {
         name: finalZoneName,
-        deliveryFee: form.deliveryFee,
-        minOrderAmount: form.minOrderAmount, // ব্যাকএন্ডে পাঠানোর জন্য
+        deliveryFee: form.isFreeShipping ? 0 : form.deliveryFee,
+        minOrderAmount: form.minOrderAmount,
+        isFreeShipping: form.isFreeShipping, // ফ্রি শিপিং অপশন ব্যাকএন্ডে পাঠানো
         estimatedDays: form.zoneCategory === "3 Hours" ? "Within 3 Hours" : form.estimatedDays,
         active: form.active,
       };
@@ -302,6 +304,7 @@ export default function DeliveryZonesPage() {
         expressSubArea: "",
         deliveryFee: 0,
         minOrderAmount: 0,
+        isFreeShipping: false,
         estimatedDays: "2-3 Days",
         active: true,
       });
@@ -337,7 +340,8 @@ export default function DeliveryZonesPage() {
       newExpressAreaName: "",
       expressSubArea: "",
       deliveryFee: zone.deliveryFee || 0,
-      minOrderAmount: zone.minOrderAmount || 0, // এডিট করার সময় ডেটা লোড করা
+      minOrderAmount: zone.minOrderAmount || 0,
+      isFreeShipping: zone.isFreeShipping || false,
       estimatedDays: zone.estimatedDays || "2-3 Days",
       active: zone.active,
     });
@@ -366,6 +370,7 @@ export default function DeliveryZonesPage() {
       expressSubArea: "",
       deliveryFee: 0,
       minOrderAmount: 0,
+      isFreeShipping: false,
       estimatedDays: "2-3 Days",
       active: true,
     });
@@ -496,7 +501,7 @@ export default function DeliveryZonesPage() {
                 )}
               </div>
 
-              {/* 3. District (জেলা) */}
+              {/* 3. District */}
               <div>
                 <div className="flex items-center justify-between mb-2">
                   <label className="text-xs font-bold uppercase tracking-wider text-gray-500">District (জেলা)</label>
@@ -712,16 +717,17 @@ export default function DeliveryZonesPage() {
             <label className="block text-xs font-bold uppercase tracking-wider text-gray-500 mb-2">Delivery Fee (৳)</label>
             <input
               type="number"
+              disabled={form.isFreeShipping}
               value={form.deliveryFee}
               onChange={(e) => setForm({ ...form, deliveryFee: Number(e.target.value) })}
               placeholder="60"
-              className="w-full rounded-2xl border bg-gray-50/50 p-3.5 text-sm outline-none focus:bg-white focus:border-black transition"
+              className="w-full rounded-2xl border bg-gray-50/50 p-3.5 text-sm outline-none focus:bg-white focus:border-black transition disabled:opacity-50"
             />
           </div>
 
           {/* Minimum Order Amount Field */}
           <div>
-            <label className="block text-xs font-bold uppercase tracking-wider text-gray-500 mb-2">Min Order Amount (৳)</label>
+            <label className="block text-xs font-bold uppercase tracking-wider text-gray-500 mb-2">Min Order Amount for Free Shipping (৳)</label>
             <input
               type="number"
               value={form.minOrderAmount}
@@ -743,17 +749,33 @@ export default function DeliveryZonesPage() {
           </div>
         </div>
 
-        <div className="mt-6 flex items-center gap-3">
-          <input
-            type="checkbox"
-            id="activeStatus"
-            checked={form.active}
-            onChange={(e) => setForm({ ...form, active: e.target.checked })}
-            className="w-5 h-5 accent-black rounded cursor-pointer"
-          />
-          <label htmlFor="activeStatus" className="text-sm font-semibold cursor-pointer select-none">
-            Active Zone (Available for checkout)
-          </label>
+        {/* Free Shipping Checkbox & Status */}
+        <div className="mt-6 flex flex-col sm:flex-row sm:items-center gap-6">
+          <div className="flex items-center gap-3">
+            <input
+              type="checkbox"
+              id="freeShippingStatus"
+              checked={form.isFreeShipping}
+              onChange={(e) => setForm({ ...form, isFreeShipping: e.target.checked, deliveryFee: e.target.checked ? 0 : form.deliveryFee })}
+              className="w-5 h-5 accent-black rounded cursor-pointer"
+            />
+            <label htmlFor="freeShippingStatus" className="text-sm font-semibold cursor-pointer select-none">
+              Always Free Shipping (Free for all orders in this zone)
+            </label>
+          </div>
+
+          <div className="flex items-center gap-3">
+            <input
+              type="checkbox"
+              id="activeStatus"
+              checked={form.active}
+              onChange={(e) => setForm({ ...form, active: e.target.checked })}
+              className="w-5 h-5 accent-black rounded cursor-pointer"
+            />
+            <label htmlFor="activeStatus" className="text-sm font-semibold cursor-pointer select-none">
+              Active Zone (Available for checkout)
+            </label>
+          </div>
         </div>
 
         <div className="flex items-center gap-3 mt-6">
@@ -791,7 +813,7 @@ export default function DeliveryZonesPage() {
               <tr className="border-b bg-gray-50/70 text-gray-500 text-xs uppercase tracking-wider">
                 <th className="p-4 sm:p-5">Zone Name</th>
                 <th className="p-4 sm:p-5">Delivery Fee</th>
-                <th className="p-4 sm:p-5">Min Order</th>
+                <th className="p-4 sm:p-5">Free Shipping Min Order</th>
                 <th className="p-4 sm:p-5">ETA</th>
                 <th className="p-4 sm:p-5">Status</th>
                 <th className="p-4 sm:p-5 text-right">Actions</th>
@@ -830,8 +852,16 @@ export default function DeliveryZonesPage() {
                           </span>
                         )}
                       </td>
-                      <td className="p-4 sm:p-5 font-medium">৳{zone.deliveryFee}</td>
-                      <td className="p-4 sm:p-5 font-medium">৳{zone.minOrderAmount || 0}</td>
+                      <td className="p-4 sm:p-5 font-medium">
+                        {zone.isFreeShipping || zone.deliveryFee === 0 ? (
+                          <span className="text-emerald-600 font-bold">FREE</span>
+                        ) : (
+                          `৳${zone.deliveryFee}`
+                        )}
+                      </td>
+                      <td className="p-4 sm:p-5 font-medium">
+                        {zone.minOrderAmount > 0 ? `৳${zone.minOrderAmount}` : "None"}
+                      </td>
                       <td className="p-4 sm:p-5 text-gray-600">{zone.estimatedDays}</td>
                       <td className="p-4 sm:p-5">
                         <span

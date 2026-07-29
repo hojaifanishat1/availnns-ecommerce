@@ -3,26 +3,86 @@
 import Link from "next/link";
 import {
   ArrowRight,
-  ShieldCheck,
   ShoppingBag,
-  Truck,
-  Sparkles,
-  Tag,
   Trash2,
+  Sparkles,
+  Flame,
 } from "lucide-react";
 import useCart from "@/hooks/useCart";
 import CartItem from "@/components/cart/CartItem";
 import { useCurrency } from "@/context/CurrencyContext";
-import { useState } from "react";
+import { useState, useEffect } from "react";
+import { getDeliveryZones } from "@/services/deliveryZone.service";
+import { getRelatedProducts } from "@/services/product.service";
+import { Product } from "@/types/product";
+import {
+  useAppDispatch,
+  useAppSelector,
+} from "@/hooks/redux";
+import { fetchDealProducts } from "@/store/slices/productSlice";
+import ProductCard from "@/components/product/ProductCard";
 
 export default function CartPage() {
-  const { cart, loading, totalItems, clearCart } = useCart();
+  const dispatch = useAppDispatch();
+  const cartContext = useCart() as any;
+  const { cart, loading: cartLoading, totalItems, clearCart } = cartContext;
   const { formatPrice } = useCurrency();
-  const [coupon, setCoupon] = useState("");
-  const [discount, setDiscount] = useState(0);
 
-  // Loading State with Modern Skeleton
-  if (loading) {
+  const [currentZone, setCurrentZone] = useState<any>(null);
+  
+  // Redux থেকে হট ডিলস প্রোডাক্টগুলো নিয়ে আসা
+  const dealProducts = useAppSelector(
+    (state: any) => state.products.deals || []
+  );
+  
+  const productsLoading = useAppSelector(
+    (state: any) => state.products.loading
+  );
+
+  const [recommendedProducts, setRecommendedProducts] = useState<Product[]>([]);
+
+  // কম্পোনেন্ট লোড হওয়ার সময় ডিল প্রোডাক্টস ফেচ করা
+  useEffect(() => {
+    dispatch(fetchDealProducts());
+  }, [dispatch]);
+
+  // কার্টের প্রোডাক্টগুলোর উপর ভিত্তি করে রিলেটেড প্রোডাক্ট এবং ডেলিভারি জোন ফেচ করা
+  useEffect(() => {
+    const fetchCartRelatedData = async () => {
+      try {
+        const zonesDataPromise = getDeliveryZones().catch(() => []);
+        
+        let relatedPromise: Promise<any> = Promise.resolve([]);
+        if (cart?.items && cart.items.length > 0) {
+          const firstItem = cart.items[0];
+          const firstProductId = firstItem.product?._id?.toString() || firstItem.product?.toString();
+          if (firstProductId) {
+            relatedPromise = getRelatedProducts(firstProductId).catch(() => []);
+          }
+        }
+
+        const [zonesData, relatedProds] = await Promise.all([
+          zonesDataPromise,
+          relatedPromise,
+        ]);
+
+        if (Array.isArray(zonesData) && zonesData.length > 0) {
+          const activeZones = zonesData.filter((z: any) => z.active);
+          setCurrentZone(activeZones[0] || zonesData[0]);
+        }
+
+        setRecommendedProducts(Array.isArray(relatedProds) ? relatedProds.slice(0, 4) : []);
+      } catch (error) {
+        console.error("Failed to load cart recommendations:", error);
+      }
+    };
+
+    if (!cartLoading) {
+      fetchCartRelatedData();
+    }
+  }, [cart, cartLoading]);
+
+  if (cartLoading) {
     return (
       <main className="flex min-h-screen items-center justify-center bg-gray-50">
         <div className="space-y-4 text-center">
@@ -33,7 +93,6 @@ export default function CartPage() {
     );
   }
 
-  // Empty Cart State
   if (!cart?.items?.length) {
     return (
       <main className="flex min-h-[80vh] items-center justify-center bg-gray-50 px-6">
@@ -54,30 +113,17 @@ export default function CartPage() {
     );
   }
 
-  // Price Calculations
   const subtotal = Number(cart.total || 0);
-  const shipping = subtotal >= 100 || subtotal === 0 ? 0 : 10;
-  const tax = subtotal * 0.05;
-  const total = subtotal + shipping + tax - discount;
-  const progress = Math.min((subtotal / 100) * 100, 100);
-
-  const handleApplyCoupon = (e: React.FormEvent) => {
-    e.preventDefault();
-    if (coupon.toUpperCase() === "DISCOUNT10") {
-      setDiscount(10);
-    } else {
-      alert("Invalid Coupon Code");
-    }
-  };
 
   return (
-    <main className="min-h-screen bg-gray-50 py-10">
-      <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
+    <main className="min-h-screen bg-gray-50 pb-32 pt-10">
+      <div className="mx-auto max-w-5xl px-4 sm:px-6 lg:px-8">
+        
         {/* Header */}
-        <div className="mb-10 flex flex-col justify-between gap-4 sm:flex-row sm:items-center">
+        <div className="mb-8 flex flex-col justify-between gap-4 sm:flex-row sm:items-center">
           <div>
-            <h1 className="text-4xl font-black tracking-tight">Shopping Cart</h1>
-            <p className="mt-2 text-gray-500">{totalItems} products currently in your cart</p>
+            <h1 className="text-3xl font-black tracking-tight">Shopping Cart</h1>
+            <p className="mt-1 text-gray-500 text-sm">{totalItems} products currently in your cart</p>
           </div>
           <button
             onClick={() => clearCart && clearCart()}
@@ -87,131 +133,96 @@ export default function CartPage() {
           </button>
         </div>
 
-        <div className="grid gap-8 lg:grid-cols-3">
-          {/* Cart Products Section */}
-          <section className="space-y-5 lg:col-span-2">
-            <div className="rounded-2xl border border-gray-200 bg-white p-6 shadow-sm">
-              <div className="mb-6 flex items-center justify-between border-b pb-4">
-                <h2 className="text-xl font-bold">Cart Items</h2>
-                <span className="rounded-full bg-gray-100 px-4 py-1 text-sm font-semibold text-gray-700">
-                  {totalItems} {totalItems === 1 ? "Item" : "Items"}
-                </span>
-              </div>
-              <div className="space-y-4">
-                {cart.items.map((item: any, index: number) => {
-                  const itemId =
-                    item.product?._id?.toString() ||
-                    item.product?.toString() ||
-                    index;
-
-                  return <CartItem key={itemId} item={item} />;
-                })}
-              </div>
+        {/* Cart Products List Section */}
+        <section className="space-y-4">
+          <div className="rounded-3xl border border-gray-200 bg-white p-6 shadow-sm">
+            <div className="mb-6 flex items-center justify-between border-b pb-4">
+              <h2 className="text-xl font-bold">Cart Items</h2>
+              <span className="rounded-full bg-gray-100 px-4 py-1 text-sm font-semibold text-gray-700">
+                {totalItems} {totalItems === 1 ? "Item" : "Items"}
+              </span>
             </div>
+            <div className="space-y-4">
+              {cart.items.map((item: any, index: number) => {
+                const itemId = item.product?._id?.toString() || item.product?.toString() || index;
+                return <CartItem key={itemId} item={item} />;
+              })}
+            </div>
+          </div>
+        </section>
 
-            {/* Benefits Grid */}
-            <div className="grid gap-4 sm:grid-cols-3">
-              {[
-                { icon: Truck, title: "Fast Delivery", desc: "2-5 business days delivery" },
-                { icon: ShieldCheck, title: "Secure Payment", desc: "100% protected checkout" },
-                { icon: Sparkles, title: "Premium Quality", desc: "Hand-verified products" },
-              ].map((b, i) => (
-                <div key={i} className="rounded-2xl border border-gray-200 bg-white p-5 shadow-sm transition hover:shadow-md">
-                  <b.icon size={24} className="text-black" />
-                  <h3 className="mt-3 font-bold text-gray-900">{b.title}</h3>
-                  <p className="mt-1 text-sm text-gray-500">{b.desc}</p>
-                </div>
+        {/* 1. Hot Deals Section (Using ProductCard) */}
+        <section className="mt-12">
+          <div className="flex items-center gap-2 mb-6">
+            <Flame className="text-orange-500" size={22} />
+            <h2 className="text-2xl font-black tracking-tight">Hot Deals</h2>
+          </div>
+
+          {productsLoading && dealProducts.length === 0 ? (
+            <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
+              {Array.from({ length: 4 }).map((_, i) => (
+                <div key={i} className="h-64 rounded-2xl bg-white animate-pulse" />
               ))}
             </div>
-          </section>
-
-          {/* Order Summary Aside */}
-          <aside className="h-fit lg:sticky lg:top-24">
-            <div className="rounded-2xl border border-gray-200 bg-white p-6 shadow-sm">
-              <h2 className="mb-6 text-xl font-black tracking-tight">Order Summary</h2>
-
-              {/* Free Shipping Progress */}
-              <div className="mb-6 rounded-xl bg-gray-50 p-4 border border-gray-100">
-                <div className="flex justify-between text-sm font-medium">
-                  <span>Free Shipping Goal</span>
-                  <span>{formatPrice(subtotal)} / {formatPrice(100)}</span>
-                </div>
-                <div className="mt-3 h-2.5 overflow-hidden rounded-full bg-gray-200">
-                  <div className="h-full bg-black transition-all duration-500" style={{ width: `${progress}%` }} />
-                </div>
-                {subtotal < 100 ? (
-                  <p className="mt-2.5 text-xs text-gray-500">
-                    Add <span className="font-semibold text-black">{formatPrice(100 - subtotal)}</span> more to unlock free shipping!
-                  </p>
-                ) : (
-                  <p className="mt-2.5 text-xs font-bold text-green-600">🎉 Free shipping unlocked successfully!</p>
-                )}
-              </div>
-
-              {/* Coupon Code Section */}
-              <form onSubmit={handleApplyCoupon} className="mb-6 flex gap-2">
-                <div className="relative flex-1">
-                  <Tag size={16} className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" />
-                  <input
-                    type="text"
-                    placeholder="Coupon code"
-                    value={coupon}
-                    onChange={(e) => setCoupon(e.target.value)}
-                    className="w-full rounded-xl border border-gray-200 bg-gray-50 py-2.5 pl-9 pr-3 text-sm focus:border-black focus:outline-none"
-                  />
-                </div>
-                <button
-                  type="submit"
-                  className="rounded-xl bg-gray-900 px-4 py-2.5 text-sm font-semibold text-white transition hover:bg-black"
-                >
-                  Apply
-                </button>
-              </form>
-
-              {/* Price Details */}
-              <div className="space-y-3.5 text-sm text-gray-600 border-b pb-6">
-                <div className="flex justify-between">
-                  <span>Subtotal</span>
-                  <span className="font-semibold text-gray-900">{formatPrice(subtotal)}</span>
-                </div>
-                <div className="flex justify-between">
-                  <span>Shipping</span>
-                  <span className="font-semibold text-gray-900">
-                    {shipping === 0 ? <span className="text-green-600 font-bold">FREE</span> : formatPrice(shipping)}
-                  </span>
-                </div>
-                {discount > 0 && (
-                  <div className="flex justify-between text-green-600">
-                    <span>Discount Applied</span>
-                    <span className="font-semibold">-{formatPrice(discount)}</span>
-                  </div>
-                )}
-                <div className="flex justify-between">
-                  <span>Estimated Tax (5%)</span>
-                  <span className="font-semibold text-gray-900">{formatPrice(tax)}</span>
-                </div>
-              </div>
-
-              <div className="mt-6 flex items-center justify-between">
-                <span className="text-lg font-bold text-gray-900">Total Amount</span>
-                <span className="text-3xl font-black text-gray-900">{formatPrice(total)}</span>
-              </div>
-
-              {/* Actions */}
-              <Link
-                href="/checkout"
-                className="mt-7 flex items-center justify-center gap-2 rounded-xl bg-black py-4 font-bold text-white transition-all hover:bg-zinc-800 hover:shadow-lg"
-              >
-                Proceed To Checkout <ArrowRight size={18} />
-              </Link>
-              <Link
-                href="/shop"
-                className="mt-3 flex items-center justify-center rounded-xl border border-gray-200 py-3 font-medium text-gray-700 transition hover:bg-gray-50"
-              >
-                Continue Shopping
-              </Link>
+          ) : dealProducts.length === 0 ? (
+            <p className="text-sm text-gray-500">No active deals right now.</p>
+          ) : (
+            <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 gap-4">
+              {dealProducts.slice(0, 4).map((prod: any) => (
+                <ProductCard key={prod._id?.toString()} product={prod} />
+              ))}
             </div>
-          </aside>
+          )}
+        </section>
+
+        {/* 2. You May Also Like (Related Products - Using ProductCard) */}
+        <section className="mt-12">
+          <div className="flex items-center gap-2 mb-6">
+            <Sparkles className="text-amber-500" size={22} />
+            <h2 className="text-2xl font-black tracking-tight">You May Also Like (Related Products)</h2>
+          </div>
+
+          {recommendedProducts.length === 0 ? (
+            <p className="text-sm text-gray-500">No related products available right now.</p>
+          ) : (
+            <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 gap-4">
+              {recommendedProducts.map((prod: any) => (
+                <ProductCard key={prod._id?.toString()} product={prod} />
+              ))}
+            </div>
+          )}
+        </section>
+
+      </div>
+
+      {/* Fixed Footer Bar */}
+      <div className="fixed bottom-0 left-0 right-0 z-50 border-t border-gray-200 bg-white/95 backdrop-blur-md shadow-lg py-4 px-4 sm:px-8">
+        <div className="max-w-5xl mx-auto flex flex-col sm:flex-row items-center justify-between gap-4">
+          <div className="flex items-center gap-6 w-full sm:w-auto justify-between sm:justify-start">
+            <div>
+              <p className="text-xs text-gray-500 font-medium">Subtotal ({totalItems} items)</p>
+              <p className="text-2xl font-black text-gray-900">{formatPrice(subtotal)}</p>
+            </div>
+            <div className="hidden sm:block h-8 w-px bg-gray-200"></div>
+            <div className="hidden sm:block">
+              <p className="text-xs text-emerald-600 font-bold">✓ Shipping & Tax Calculated at Checkout</p>
+            </div>
+          </div>
+
+          <div className="flex items-center gap-3 w-full sm:w-auto">
+            <Link
+              href="/shop"
+              className="flex-1 sm:flex-none text-center rounded-xl border border-gray-300 bg-white px-6 py-3.5 text-sm font-bold text-gray-700 transition hover:bg-gray-50"
+            >
+              Continue Shopping
+            </Link>
+            <Link
+              href="/checkout"
+              className="flex-1 sm:flex-none flex items-center justify-center gap-2 rounded-xl bg-black px-8 py-3.5 text-sm font-bold text-white transition-all hover:bg-zinc-800 hover:shadow-lg"
+            >
+              Proceed To Checkout <ArrowRight size={16} />
+            </Link>
+          </div>
         </div>
       </div>
     </main>

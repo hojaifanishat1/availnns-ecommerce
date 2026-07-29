@@ -1,889 +1,336 @@
 "use client";
 
-import {
-  useState
-} from "react";
-
+import { useState, useEffect, useMemo } from "react";
 import Image from "next/image";
 import Link from "next/link";
-
-
 import {
   Heart,
   Plus,
   Minus,
-  ShoppingCart,
   Star,
   Eye,
+  AlertTriangle,
+  FolderTree,
+  Zap,
+  Truck,
 } from "lucide-react";
-
-
-import {
-  Product
-} from "@/types/product";
-
-
+import { Product } from "@/types/product";
 import useCart from "@/hooks/useCart";
+import { useWishlist } from "@/context/WishlistContext";
+import { useCurrency } from "@/context/CurrencyContext";
 
-
-import {
-  useWishlist
-} from "@/context/WishlistContext";
-
-
-import {
-  useCurrency
-} from "@/context/CurrencyContext";
-
-
-
-
+interface ProductCardProps {
+  product: Product;
+  onQuickView?: (product: Product) => void;
+  freeDeliveryThreshold?: number;
+}
 
 export default function ProductCard({
- product,
-}:{
- product:Product;
-}){
-
-
-
-const {
- cart,
- addItem,
- updateItem,
-}=useCart();
-
-
-
-
-
-const {
- addToWishlist,
- removeFromWishlist,
- isInWishlist,
-}=useWishlist();
-
-
-
-
-
-const {
- formatPrice
-}=useCurrency();
-
-
-
-
-
-
-const [hoverImage,setHoverImage]=
-useState(false);
-
-
-
-
-
-const wish =
-isInWishlist(product._id);
-
-
-
-
-
-
-const firstImage =
-product.images?.[0]?.url ||
-"/placeholder.png";
-
-
-
-const secondImage =
-product.images?.[1]?.url ||
-firstImage;
-
-
-
-
-
-
-
-
-const cartItem =
-cart?.items?.find(
-(item:any)=>
-
-item.product?._id === product._id ||
-
-item.product === product._id
-
-);
-
-
-
-const quantity =
-cartItem?.quantity || 0;
-
-
-
-
-
-
-
-
-const discount =
-product.discountPrice &&
-product.discountPrice < product.price
-
-?
-
-Math.round(
-
-(
-(product.price-product.discountPrice)
-/product.price
-
-)*100
-
-)
-
-:
-
-0;
-
-
-
-
-
-
-
-const increaseCart = async(e: React.MouseEvent)=>{
-
-e.preventDefault();
-e.stopPropagation();
-
-if(quantity >= product.stock)
-return;
-
-// পুরো product অবজেক্ট পাস করা হলো যাতে গেস্ট ইউজারের ক্ষেত্রেও ছবি ও স্টক ঠিক থাকে
-await addItem(
-product,
-1
-);
-
-
-};
-
-
-
-
-
-
-
-const decreaseCart = async(e: React.MouseEvent)=>{
-
-e.preventDefault();
-e.stopPropagation();
-
-if(quantity<=1){
-
-await updateItem(
-product._id,
-0
-);
-
-return;
-
-}
-
-
-await updateItem(
-product._id,
-quantity-1
-);
-
-
-};
-
-
-
-
-
-
-
-
-return (
-
-<div
-
-className="
-group
-overflow-hidden
-rounded-3xl
-border
-bg-white
-shadow-sm
-transition-all
-duration-300
-hover:-translate-y-1
-hover:shadow-2xl
-"
-
->
-
-
-<div
-
-className="
-relative
-h-72
-overflow-hidden
-bg-gray-100
-"
-
-onMouseEnter={()=>
-setHoverImage(true)
-}
-
-onMouseLeave={()=>
-setHoverImage(false)
-}
-
->
-
-
-<Link
-href={`/products/${product._id}`}
->
-
-
-<Image
-
-src={
-hoverImage
-?
-secondImage
-:
-firstImage
-}
-
-alt={product.name}
-
-fill
-
-sizes="
-(max-width:768px) 100vw,
-25vw
-"
-
-className="
-object-cover
-transition
-duration-500
-group-hover:scale-110
-"
-
-/>
-
-
-</Link>
-
-
-
-
-{
-discount>0 &&
-
-<span
-
-className="
-absolute
-left-4
-top-4
-rounded-full
-bg-red-500
-px-3
-py-1
-text-xs
-font-bold
-text-white
-pointer-events-none
-"
-
->
-
--{discount}%
-
-</span>
-
-}
-
-
-
-
-
-
-
-{
-product.isBestSeller &&
-
-<span
-
-className="
-absolute
-bottom-4
-left-4
-rounded-full
-bg-black
-px-3
-py-1
-text-xs
-text-white
-pointer-events-none
-"
-
->
-
-Best Seller
-
-</span>
-
-}
-
-
-
-
-
-<button
-
-type="button"
-onClick={(e)=>{
-
-e.preventDefault();
-e.stopPropagation();
-
-if(wish){
-
-removeFromWishlist(
-product._id
-);
-
-
-}else{
-
-
-addToWishlist({
-
-_id:product._id,
-
-name:product.name,
-
-price:
-product.discountPrice ||
-product.price,
-
-image:firstImage
-
-});
-
-
-}
-
-}}
-
-className="
-absolute
-right-4
-top-4
-rounded-full
-bg-white
-p-3
-shadow-lg
-hover:scale-110
-z-20
-cursor-pointer
-"
-
->
-
-
-<Heart
-
-size={20}
-
-className={
-
-wish
-?
-
-"fill-red-500 text-red-500"
-
-:
-
-"text-gray-700"
-
-}
-
-/>
-
-
-</button>
-
-{/* Quick View */}
-
-<button
-
-type="button"
-onClick={(e)=>{
-e.preventDefault();
-e.stopPropagation();
-}}
-
-className="
-absolute
-bottom-4
-left-4
-flex
-items-center
-gap-2
-rounded-full
-bg-white
-px-4
-py-2
-text-sm
-shadow
-opacity-0
-transition
-group-hover:opacity-100
-z-20
-cursor-pointer
-"
-
->
-
-<Eye size={16}/>
-
-Quick View
-
-</button>
-
-
-
-
-
-
-
-{/* Cart Button */}
-
-<div
-
-className="
-absolute
-bottom-4
-right-4
-z-20
-"
-
->
-
-
-{
-
-quantity===0 ?
-
-
-<button
-
-type="button"
-disabled={
-product.stock===0
-}
-
-onClick={increaseCart}
-
-
-className={`
-flex
-h-12
-w-12
-items-center
-justify-center
-rounded-full
-shadow-xl
-transition
-hover:scale-110
-cursor-pointer
-
-${
-product.stock===0
-
-?
-
-"bg-gray-400 cursor-not-allowed"
-
-:
-
-"bg-black text-white"
-
-}
-
-`}
-
->
-
-<ShoppingCart size={22}/>
-
-</button>
-
-
-
-:
-
-
-<div
-
-className="
-flex
-items-center
-gap-3
-rounded-full
-bg-black
-px-4
-py-2
-text-white
-"
-
->
-
-
-<button
-
-type="button"
-onClick={decreaseCart}
-className="cursor-pointer"
->
-
-<Minus size={16}/>
-
-</button>
-
-
-
-
-<span
-
-className="
-font-bold
-"
-
->
-
-{quantity}
-
-</span>
-
-
-
-
-
-<button
-
-type="button"
-disabled={
-quantity>=product.stock
-}
-
-onClick={increaseCart}
-className="cursor-pointer"
->
-
-<Plus size={16}/>
-
-</button>
-
-
-
-</div>
-
-
-}
-
-
-</div>
-
-
-
-</div>
-
-
-
-
-
-
-
-
-{/* Product Info */}
-
-
-<div
-
-className="
-p-5
-"
-
->
-
-
-
-<div
-
-className="
-flex
-items-center
-gap-1
-text-yellow-500
-"
-
->
-
-<Star
-
-size={15}
-
-fill="currentColor"
-
-/>
-
-
-<span>
-
-{product.rating || 5}
-
-</span>
-
-
-</div>
-
-
-
-
-
-
-<Link
-href={`/products/${product._id}`}
->
-
-
-<h3
-
-className="
-mt-2
-truncate
-text-lg
-font-semibold
-hover:text-blue-600
-"
-
->
-
-{product.name}
-
-</h3>
-
-
-</Link>
-
-
-
-
-
-
-<p
-
-className="
-text-sm
-text-gray-500
-"
-
->
-
-
-{
-
-typeof product.category==="object"
-
-?
-
-product.category.name
-
-:
-
-""
-
-}
-
-
-</p>
-
-
-
-
-
-
-
-
-{/* Currency Updated Price */}
-
-
-<div
-
-className="
-mt-4
-flex
-items-center
-gap-3
-"
-
->
-
-
-<p
-
-className="
-text-2xl
-font-bold
-"
-
->
-
-
-{
-
-formatPrice(
-
-product.discountPrice &&
-product.discountPrice > 0
-
-?
-
-product.discountPrice
-
-:
-
-product.price
-
-)
-
-}
-
-
-</p>
-
-
-
-
-
-
-
-
-{
-
-product.discountPrice &&
-product.discountPrice > 0 &&
-
-
-
-<p
-
-className="
-text-sm
-text-gray-400
-line-through
-"
-
->
-
-
-{
-
-formatPrice(
-product.price
-)
-
-}
-
-
-</p>
-
-
-}
-
-
-
-</div>
-
-
-
-
-
-
-
-{
-
-product.stock > 0
-
-
-?
-
-
-<p
-
-className="
-mt-2
-text-sm
-font-medium
-text-green-600
-"
-
->
-
-✓ {product.stock} items available
-
-</p>
-
-
-
-:
-
-
-<p
-
-className="
-mt-2
-text-sm
-font-medium
-text-red-500
-"
-
->
-
-Out of Stock
-
-</p>
-
-
-
-}
-
-
-
-</div>
-
-
-
-
-</div>
-
-
-);
-
+  product,
+  onQuickView,
+  freeDeliveryThreshold = 1000,
+}: ProductCardProps) {
+  const { cart, addItem, updateItem } = useCart();
+  const { addToWishlist, removeFromWishlist, isInWishlist } = useWishlist();
+  const { formatPrice } = useCurrency();
+
+  const [hoverImage, setHoverImage] = useState(false);
+  const [currentIndex, setCurrentIndex] = useState(0);
+  const [isTransitioning, setIsTransitioning] = useState(true);
+
+  const isWishlisted = isInWishlist(product._id);
+
+  const primaryImage = product.images?.[0]?.url || "/placeholder.png";
+  const secondaryImage = product.images?.[1]?.url || primaryImage;
+
+  const cartItem = cart?.items?.find(
+    (item: any) =>
+      item.product?._id === product._id || item.product === product._id
+  );
+
+  const quantity = cartItem?.quantity || 0;
+
+  const regularPrice = product.price;
+  const salePrice =
+    product.discountPrice ||
+    (product as any).oldPrice ||
+    (product as any).compareAtPrice;
+
+  const discountPercentage =
+    salePrice && salePrice < regularPrice
+      ? Math.round(((regularPrice - salePrice) / regularPrice) * 100)
+      : 0;
+
+  const handleIncreaseCart = async (e: React.MouseEvent) => {
+    e.preventDefault();
+    e.stopPropagation();
+    if (quantity >= product.stock) return;
+    await addItem(product, 1);
+  };
+
+  const handleDecreaseCart = async (e: React.MouseEvent) => {
+    e.preventDefault();
+    e.stopPropagation();
+    if (quantity <= 1) {
+      await updateItem(product._id, 0);
+      return;
+    }
+    await updateItem(product._id, quantity - 1);
+  };
+
+  const rating = product.rating || 0;
+  const numReviews = product.numReviews || 0;
+
+  const categoryName =
+    typeof product.category === "string"
+      ? product.category
+      : product.category?.name || "General";
+
+  // Base Slide Items
+  const baseSlideItems = useMemo(() => {
+    const items = [];
+
+    if (product.stock > 0 && product.stock <= 5) {
+      items.push({
+        icon: <AlertTriangle size={13} className="text-amber-500 shrink-0" />,
+        text: `Hurry! Only ${product.stock} items left`,
+        textColor: "text-amber-600 font-medium",
+      });
+    }
+
+    items.push({
+      icon: <FolderTree size={13} className="text-blue-500 shrink-0" />,
+      text: `Category: ${categoryName}`,
+      textColor: "text-zinc-600 font-medium",
+    });
+
+    if (discountPercentage >= 25) {
+      items.push({
+        icon: <Zap size={13} className="text-rose-500 shrink-0 fill-rose-500" />,
+        text: `Mega Deals - ${discountPercentage}% OFF`,
+        textColor: "text-rose-600 font-bold",
+      });
+    }
+
+    items.push({
+      icon: <Truck size={13} className="text-emerald-500 shrink-0" />,
+      text: `Free Delivery over ${formatPrice(freeDeliveryThreshold)}`,
+      textColor: "text-emerald-600 font-medium",
+    });
+
+    return items;
+  }, [product.stock, categoryName, discountPercentage, freeDeliveryThreshold, formatPrice]);
+
+  // Seamless Extended List (Appending the first item at the end for flawless loop)
+  const extendedSlideItems = useMemo(() => {
+    if (baseSlideItems.length <= 1) return baseSlideItems;
+    return [...baseSlideItems, baseSlideItems[0]];
+  }, [baseSlideItems]);
+
+  // Perfect Seamless Loop Animation Effect
+  useEffect(() => {
+    if (baseSlideItems.length <= 1) return;
+
+    const interval = setInterval(() => {
+      setCurrentIndex((prev) => {
+        const nextIndex = prev + 1;
+        
+        if (nextIndex === extendedSlideItems.length - 1) {
+          setTimeout(() => {
+            setIsTransitioning(false);
+            setCurrentIndex(0);
+            
+            setTimeout(() => {
+              setIsTransitioning(true);
+            }, 50);
+          }, 500);
+        }
+        
+        return nextIndex;
+      });
+    }, 3000);
+
+    return () => clearInterval(interval);
+  }, [extendedSlideItems.length, baseSlideItems.length]);
+
+  return (
+    <div className="group relative flex flex-col justify-between overflow-hidden rounded-2xl border border-gray-100 bg-white p-3 shadow-xs transition-all duration-300 hover:-translate-y-1 hover:shadow-xl h-full">
+      <div>
+        {/* Image & Interactive Overlay Container */}
+        <div
+          className="relative h-64 w-full overflow-hidden rounded-xl bg-gray-50"
+          onMouseEnter={() => setHoverImage(true)}
+          onMouseLeave={() => setHoverImage(false)}
+        >
+          <Link href={`/products/${product._id}`} className="block h-full w-full">
+            <Image
+              src={hoverImage ? secondaryImage : primaryImage}
+              alt={product.name || "Product image"}
+              fill
+              sizes="(max-width: 768px) 100vw, 25vw"
+              className={`object-cover transition-transform duration-700 group-hover:scale-105 ${
+                product.stock === 0 ? "grayscale opacity-60" : ""
+              }`}
+            />
+          </Link>
+
+          {/* Product Status Badges */}
+          <div className="absolute left-3 top-3 flex flex-col gap-1 z-10 pointer-events-none">
+            {product.isBestSeller && product.stock > 0 && (
+              <span className="rounded-md bg-zinc-900 px-2.5 py-1 text-[11px] font-bold tracking-wide text-white shadow-xs">
+                Hot
+              </span>
+            )}
+            {product.stock === 0 && (
+              <span className="rounded-md bg-zinc-800 px-2.5 py-1 text-[11px] font-bold tracking-wide text-white shadow-xs">
+                Sold Out
+              </span>
+            )}
+          </div>
+
+          {/* Wishlist Toggle Button */}
+          <button
+            type="button"
+            onClick={(e) => {
+              e.preventDefault();
+              e.stopPropagation();
+              if (isWishlisted) {
+                removeFromWishlist(product._id);
+              } else {
+                addToWishlist({
+                  _id: product._id,
+                  name: product.name,
+                  price: salePrice && salePrice > 0 ? salePrice : regularPrice,
+                  image: primaryImage,
+                });
+              }
+            }}
+            className="absolute right-3 top-3 rounded-full bg-white/80 p-2.5 backdrop-blur-md shadow-sm transition hover:bg-white hover:scale-110 z-20 cursor-pointer text-zinc-700"
+            aria-label="Wishlist"
+          >
+            <Heart
+              size={18}
+              className={isWishlisted ? "fill-rose-500 text-rose-500" : ""}
+            />
+          </button>
+
+          {/* Quick View Button */}
+          <button
+            type="button"
+            onClick={(e) => {
+              e.preventDefault();
+              e.stopPropagation();
+              if (onQuickView) onQuickView(product);
+            }}
+            className="absolute bottom-3 left-1/2 -translate-x-1/2 flex items-center gap-1.5 rounded-full bg-white/90 backdrop-blur-md px-4 py-2 text-xs font-semibold shadow-md opacity-0 translate-y-2 transition-all duration-300 group-hover:opacity-100 group-hover:translate-y-0 z-20 cursor-pointer text-zinc-900 hover:bg-white"
+          >
+            <Eye size={14} />
+            Quick View
+          </button>
+
+          {/* Cart Quantity Controller / Add Button */}
+          <div className="absolute right-3 bottom-3 z-20">
+            {quantity === 0 ? (
+              <button
+                type="button"
+                disabled={product.stock === 0}
+                onClick={handleIncreaseCart}
+                className={`flex h-11 w-11 items-center justify-center rounded-2xl shadow-lg transition hover:scale-110 active:scale-95 cursor-pointer backdrop-blur-md ${
+                  product.stock === 0
+                    ? "bg-gray-200/80 text-gray-400 cursor-not-allowed"
+                    : "bg-white/90 text-zinc-900 hover:bg-zinc-900 hover:text-white"
+                }`}
+                title="Add to Cart"
+              >
+                <Plus size={20} />
+              </button>
+            ) : (
+              <div className="flex items-center gap-2 rounded-2xl bg-zinc-900/90 backdrop-blur-md px-3 py-2 text-white shadow-lg">
+                <button
+                  type="button"
+                  onClick={handleDecreaseCart}
+                  className="cursor-pointer text-zinc-300 hover:text-white transition"
+                >
+                  <Minus size={14} />
+                </button>
+                <span className="font-bold text-xs min-w-[14px] text-center">
+                  {quantity}
+                </span>
+                <button
+                  type="button"
+                  disabled={quantity >= product.stock}
+                  onClick={handleIncreaseCart}
+                  className="cursor-pointer text-zinc-300 hover:text-white transition disabled:opacity-40"
+                >
+                  <Plus size={14} />
+                </button>
+              </div>
+            )}
+          </div>
+        </div>
+
+        {/* Product Details Section */}
+        <div className="pt-4 px-1">
+          <Link href={`/products/${product._id}`}>
+            <h3 className="font-semibold text-sm text-zinc-900 line-clamp-1 transition hover:text-zinc-600">
+              {product.name}
+            </h3>
+          </Link>
+
+          {/* Ratings and Reviews */}
+          <div className="flex items-center gap-1.5 text-xs my-1.5">
+            <div className="flex items-center gap-1 text-amber-500 font-bold">
+              <Star size={13} fill="currentColor" />
+              <span>{rating > 0 ? rating.toFixed(1) : "0.0"}</span>
+            </div>
+            <span className="text-zinc-400 font-medium">({numReviews})</span>
+          </div>
+
+          {/* Price & Discount Section */}
+          <div className="mt-2 flex items-center justify-between">
+            <div className="flex items-baseline gap-2">
+              <span className="text-lg font-black text-zinc-900">
+                {formatPrice(
+                  salePrice && salePrice > 0 ? salePrice : regularPrice
+                )}
+              </span>
+              {salePrice && salePrice > 0 && salePrice < regularPrice && (
+                <span className="text-xs font-medium text-zinc-400 line-through">
+                  {formatPrice(regularPrice)}
+                </span>
+              )}
+            </div>
+
+            {discountPercentage > 0 && product.stock > 0 && (
+              <span className="rounded-md bg-rose-50 px-2 py-0.5 text-[11px] font-extrabold text-rose-600">
+                -{discountPercentage}%
+              </span>
+            )}
+          </div>
+        </div>
+      </div>
+
+      {/* Footer Info Slider (Fixed Height & Perfect Vertical Center) */}
+      <div className="mt-3 pt-2.5 border-t border-gray-100 px-1 overflow-hidden h-7 relative flex items-center">
+        <div
+          className={`absolute inset-x-1 flex flex-col ${
+            isTransitioning ? "transition-transform duration-500 ease-in-out" : ""
+          }`}
+          style={{
+            transform: `translateY(-${currentIndex * 28}px)`,
+          }}
+        >
+          {extendedSlideItems.map((item, index) => (
+            <div
+              key={index}
+              className="h-7 shrink-0 flex items-center gap-1.5 text-[11px]"
+            >
+              <span className="flex items-center justify-center shrink-0">{item.icon}</span>
+              <span className={`truncate leading-none ${item.textColor}`}>{item.text}</span>
+            </div>
+          ))}
+        </div>
+      </div>
+    </div>
+  );
 }

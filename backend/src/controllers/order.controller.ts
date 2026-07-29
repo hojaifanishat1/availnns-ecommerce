@@ -27,9 +27,26 @@ export const createOrder = async (req: Request, res: Response): Promise<void> =>
     } = req.body;
 
     // ===============================
+    // SHIPPING ADDRESS VALIDATION
+    // ===============================
+    if (
+      !shippingAddress ||
+      !shippingAddress.fullName ||
+      !shippingAddress.phone ||
+      !shippingAddress.address
+    ) {
+      await session.abortTransaction();
+      res.status(400).json({
+        success: false,
+        message: "Complete shipping address (fullName, phone, address) is required"
+      });
+      return;
+    }
+
+    // ===============================
     // PAYMENT VALIDATION
     // ===============================
-    const allowedPayment = ["COD", "CARD", "BKASH", "NAGAD", "SSLCOMMERZ"];
+    const allowedPayment = ["COD", "SSLCOMMERZ", "BKASH", "NAGAD", "CARD"];
     if (paymentMethod && !allowedPayment.includes(paymentMethod)) {
       await session.abortTransaction();
       res.status(400).json({
@@ -56,7 +73,7 @@ export const createOrder = async (req: Request, res: Response): Promise<void> =>
     }
 
     // ===============================
-    // STOCK CHECK
+    // STOCK CHECK & ORDER ITEMS
     // ===============================
     const orderItems: any[] = [];
 
@@ -84,14 +101,14 @@ export const createOrder = async (req: Request, res: Response): Promise<void> =>
       orderItems.push({
         product: product._id,
         name: product.name,
-        image: product.images?.[0]?.url || "",
+        image: product.images?.[0]?.url || product.images?.[0] || "",
         quantity: item.quantity,
-        price: item.price
+        price: product.discountPrice || product.price || item.price
       });
     }
 
     // ===============================
-    // PRICE
+    // SUBTOTAL
     // ===============================
     const subtotal = orderItems.reduce(
       (sum: number, item: any) => sum + item.price * item.quantity,
@@ -105,7 +122,7 @@ export const createOrder = async (req: Request, res: Response): Promise<void> =>
     let deliveryZoneName = "Standard Delivery";
     let zoneId: any = null;
 
-    if (deliveryZone) {
+    if (deliveryZone && mongoose.Types.ObjectId.isValid(deliveryZone)) {
       const zone = await DeliveryZone.findById(deliveryZone).session(session);
 
       if (zone) {
@@ -166,7 +183,7 @@ export const createOrder = async (req: Request, res: Response): Promise<void> =>
     // ===============================
     // TAX + TOTAL
     // ===============================
-    const tax = subtotal * 0.05;
+    const tax = subtotal * 0.05; // ৫% ট্যাক্স
     const totalPrice = Math.max(0, subtotal + deliveryFee + tax - discountAmount);
 
     // ===============================
@@ -177,7 +194,23 @@ export const createOrder = async (req: Request, res: Response): Promise<void> =>
         {
           user: userId,
           items: orderItems,
-          shippingAddress,
+          shippingAddress: {
+            fullName: shippingAddress.fullName,
+            phone: shippingAddress.phone,
+            address: shippingAddress.address,
+            country: shippingAddress.country || "Bangladesh",
+            location: {
+              formattedAddress: shippingAddress.location?.formattedAddress || "",
+              division: shippingAddress.location?.division || "",
+              district: shippingAddress.location?.district || "",
+              area: shippingAddress.location?.area || "",
+              road: shippingAddress.location?.road || "",
+              postalCode: shippingAddress.location?.postalCode || "",
+              latitude: shippingAddress.location?.latitude || "",
+              longitude: shippingAddress.location?.longitude || "",
+              googleMapLink: shippingAddress.location?.googleMapLink || ""
+            }
+          },
           deliveryZone: zoneId,
           deliveryZoneName,
           deliveryFee,
@@ -221,7 +254,6 @@ export const createOrder = async (req: Request, res: Response): Promise<void> =>
     // CLEAR CART
     // ===============================
     cart.items = [];
-    cart.total = 0;
     await cart.save({ session });
 
     await session.commitTransaction();
@@ -349,30 +381,11 @@ export const updateOrderStatus = async (req: Request, res: Response): Promise<vo
 
     await order.save();
 
+    const populatedOrder = await Order.findById(order._id).populate("user", "name email phone");
 
-// ===============================
-// SEND ORDER STATUS EMAIL
-// ===============================
-
-const populatedOrder =
-await Order.findById(order._id)
-.populate(
-  "user",
-  "name email phone"
-);
-
-
-if(
-  populatedOrder &&
-  populatedOrder.user
-){
-
-  await sendOrderStatusEmail(
-    populatedOrder.user,
-    populatedOrder
-  );
-
-}
+    if (populatedOrder && populatedOrder.user) {
+      await sendOrderStatusEmail(populatedOrder.user, populatedOrder);
+    }
 
     res.status(200).json({
       success: true,
@@ -429,7 +442,7 @@ export const cancelOrder = async (req: Request, res: Response): Promise<void> =>
           update: { 
             $inc: { 
               stock: item.quantity,
-              totalSold: -item.quantity // ক্যানসেল হলে totalSold কমিয়ে দেওয়া হলো
+              totalSold: -item.quantity 
             } 
           }
         }
