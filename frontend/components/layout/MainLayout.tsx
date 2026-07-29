@@ -13,17 +13,17 @@ export default function MainLayout({
 }) {
   const pathname = usePathname();
   const isAdmin = pathname.startsWith("/admin");
+  const isHomePage = pathname === "/";
 
   return (
-    <>
+    <div className="flex min-h-screen flex-col">
       {!isAdmin && <Header />}
-      
-      {/* Address pin bar will show on all pages except admin */}
-      {!isAdmin && <AddressPinBar />}
 
-      <main>{children}</main>
+      {isHomePage && !isAdmin && <AddressPinBar />}
+
+      <main className="flex-1 pb-28 sm:pb-32">{children}</main>
 
       {!isAdmin && <Footer />}
-    </>
+    </div>
   );
 }

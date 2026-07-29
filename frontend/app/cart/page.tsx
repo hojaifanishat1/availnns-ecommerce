@@ -116,7 +116,7 @@ export default function CartPage() {
   const subtotal = Number(cart.total || 0);
 
   return (
-    <main className="min-h-screen bg-gray-50 pb-32 pt-10">
+    <main className="min-h-screen bg-gray-50 pb-40 pt-10">
       <div className="mx-auto max-w-5xl px-4 sm:px-6 lg:px-8">
         
         {/* Header */}
@@ -196,29 +196,32 @@ export default function CartPage() {
       </div>
 
       {/* Fixed Footer Bar */}
-      <div className="fixed bottom-0 left-0 right-0 z-50 border-t border-gray-200 bg-white/95 backdrop-blur-md shadow-lg py-4 px-4 sm:px-8">
-        <div className="max-w-5xl mx-auto flex flex-col sm:flex-row items-center justify-between gap-4">
-          <div className="flex items-center gap-6 w-full sm:w-auto justify-between sm:justify-start">
+      <div
+        className="fixed bottom-0 left-0 right-0 z-[60] border-t border-gray-200 bg-white/95 backdrop-blur-md shadow-lg py-4 px-4 sm:px-8 pb-8 sm:pb-5"
+        style={{ bottom: "calc(env(safe-area-inset-bottom, 0px) + 4rem)" }}
+      >
+        <div className="mx-auto flex max-w-5xl flex-col items-center justify-between gap-4 sm:flex-row">
+          <div className="flex w-full items-center justify-between gap-6 sm:w-auto sm:justify-start">
             <div>
-              <p className="text-xs text-gray-500 font-medium">Subtotal ({totalItems} items)</p>
+              <p className="text-xs font-medium text-gray-500">Subtotal ({totalItems} items)</p>
               <p className="text-2xl font-black text-gray-900">{formatPrice(subtotal)}</p>
             </div>
-            <div className="hidden sm:block h-8 w-px bg-gray-200"></div>
+            <div className="hidden h-8 w-px bg-gray-200 sm:block"></div>
             <div className="hidden sm:block">
-              <p className="text-xs text-emerald-600 font-bold">✓ Shipping & Tax Calculated at Checkout</p>
+              <p className="text-xs font-bold text-emerald-600">✓ Shipping & Tax Calculated at Checkout</p>
             </div>
           </div>
 
-          <div className="flex items-center gap-3 w-full sm:w-auto">
+          <div className="flex w-full items-center gap-3 sm:w-auto">
             <Link
               href="/shop"
-              className="flex-1 sm:flex-none text-center rounded-xl border border-gray-300 bg-white px-6 py-3.5 text-sm font-bold text-gray-700 transition hover:bg-gray-50"
+              className="flex-1 rounded-xl border border-gray-300 bg-white px-6 py-3.5 text-center text-sm font-bold text-gray-700 transition hover:bg-gray-50 sm:flex-none"
             >
               Continue Shopping
             </Link>
             <Link
               href="/checkout"
-              className="flex-1 sm:flex-none flex items-center justify-center gap-2 rounded-xl bg-black px-8 py-3.5 text-sm font-bold text-white transition-all hover:bg-zinc-800 hover:shadow-lg"
+              className="flex flex-1 items-center justify-center gap-2 rounded-xl bg-black px-8 py-3.5 text-sm font-bold text-white transition-all hover:bg-zinc-800 hover:shadow-lg sm:flex-none"
             >
               Proceed To Checkout <ArrowRight size={16} />
             </Link>

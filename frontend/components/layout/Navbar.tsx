@@ -26,12 +26,14 @@ export default function Navbar() {
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
   const [cartOpen, setCartOpen] = useState(false);
 
-  const { totalItems } = useCart();
+  const { cart, totalItems } = useCart();
   const { wishlist } = useWishlist();
   const wishlistCount = wishlist?.length || 0;
 
   const { user } = useAuth();
   const pathname = usePathname();
+
+  const distinctCartItems = cart?.items?.length || 0;
 
   const isActive = (href: string) => {
     if (href === "/") {
@@ -90,9 +92,9 @@ export default function Navbar() {
               aria-label="Shopping Cart"
             >
               <ShoppingCart size={22} className="transition-transform duration-300 group-hover:scale-110" />
-              {totalItems > 0 && (
+              {distinctCartItems > 0 && (
                 <span className="absolute -top-0.5 -right-0.5 bg-zinc-900 text-white text-[10px] w-4.5 h-4.5 rounded-full flex items-center justify-center font-bold shadow-xs">
-                  {totalItems > 99 ? "99+" : totalItems}
+                  {distinctCartItems > 99 ? "99+" : distinctCartItems}
                 </span>
               )}
             </button>

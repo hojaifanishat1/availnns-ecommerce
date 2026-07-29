@@ -5,6 +5,7 @@ import {
   useContext,
   useEffect,
   useState,
+  useCallback,
 } from "react";
 
 import {
@@ -13,6 +14,7 @@ import {
   updateCart as updateCartAPI,
   removeCartItem as removeCartAPI,
   clearCart as clearCartAPI,
+  mergeCart as mergeCartAPI,
 } from "@/services/cart.service";
 
 type CartContextType = {
@@ -54,42 +56,56 @@ export function CartProvider({
 
   const [loading, setLoading] = useState(true);
   const [cartLoading, setCartLoading] = useState(false);
+  const [authToken, setAuthToken] = useState<string | null>(
+    typeof window !== "undefined" ? localStorage.getItem("token") : null
+  );
 
-  // ==========================
-  // UPDATE CART STATE (Fixed Duplicate Issue)
-  // ==========================
-  const updateCartState = (data: any) => {
-    const rawCart =
-      data?.cart ||
-      data ||
-      {
-        items: [],
-      };
+  const getProductId = useCallback((value: any) => {
+    if (!value) return null;
 
-    // Prevent duplicates by combining items with the same product ID
+    if (typeof value === "string") return value;
+
+    if (typeof value === "object") {
+      return (
+        value._id?.toString?.() ||
+        value.id?.toString?.() ||
+        value.productId?.toString?.() ||
+        null
+      );
+    }
+
+    return null;
+  }, []);
+
+  const normalizeCartItems = useCallback((items: any[] = []) => {
     const mergedMap = new Map();
 
-    (rawCart.items || []).forEach((item: any) => {
+    (items || []).forEach((item: any) => {
       const prod = item.product || {};
-      const prodId = typeof prod === "string" ? prod : prod._id?.toString() || prod.id?.toString();
+      const prodId = getProductId(prod);
 
       if (!prodId) return;
 
-      const formattedProduct = typeof prod === "string" ? { _id: prod } : {
-        ...prod,
-        name: prod.name || "Product",
-        images: prod.images || [],
-        price: prod.discountPrice || prod.price || item.price || 0,
-        stock: prod.stock !== undefined ? prod.stock : 10,
-      };
+      const formattedProduct =
+        typeof prod === "string"
+          ? { _id: prod }
+          : {
+              ...prod,
+              name: prod.name || "Product",
+              images: prod.images || [],
+              price: prod.discountPrice || prod.price || item.price || 0,
+              stock: prod.stock !== undefined ? prod.stock : 10,
+            };
 
-      const itemPrice = item.price || prod.discountPrice || prod.price || 0;
+      const itemPrice = Number(
+        item.price || prod.discountPrice || prod.price || 0
+      );
       const itemQty = Number(item.quantity || 1);
 
       if (mergedMap.has(prodId)) {
-        // If already exists in current response, sum quantities
         const existing = mergedMap.get(prodId);
         existing.quantity += itemQty;
+        existing.price = Number(existing.price || 0) + itemPrice * itemQty;
       } else {
         mergedMap.set(prodId, {
           ...item,
@@ -100,19 +116,38 @@ export function CartProvider({
       }
     });
 
-    const formattedItems = Array.from(mergedMap.values());
+    return Array.from(mergedMap.values()).map((entry: any) => ({
+      ...entry,
+      quantity: Number(entry.quantity || 1),
+      price: Number(entry.price || 0),
+    }));
+  }, [getProductId]);
+
+  // ==========================
+  // UPDATE CART STATE (Fixed Duplicate Issue)
+  // ==========================
+  const updateCartState = useCallback((data: any) => {
+    const rawCart = data?.cart || data || { items: [] };
+    const formattedItems = normalizeCartItems(rawCart.items || []);
 
     const total = formattedItems.reduce(
       (sum: number, item: any) => sum + item.price * item.quantity,
       0
     );
 
-    setCart({
+    const totalItems = formattedItems.reduce(
+      (sum: number, item: any) => sum + Number(item.quantity || 0),
+      0
+    );
+
+    setCart((prev: any) => ({
+      ...prev,
       ...rawCart,
       items: formattedItems,
       total,
-    });
-  };
+      totalItems,
+    }));
+  }, [normalizeCartItems]);
 
   // ==========================
   // GUEST SAVE
@@ -127,24 +162,70 @@ export function CartProvider({
   // ==========================
   // GET GUEST CART
   // ==========================
+  const normalizeGuestCartItems = (items: any[] = []) => {
+    const mergedMap = new Map();
+
+    (items || []).forEach((item: any) => {
+      const product = item.product || {};
+      const productId = getProductId(product);
+
+      if (!productId) return;
+
+      const quantity = Number(item.quantity || 1);
+
+      if (mergedMap.has(productId)) {
+        const existing = mergedMap.get(productId);
+        existing.quantity += quantity;
+      } else {
+        mergedMap.set(productId, {
+          ...item,
+          product,
+          quantity,
+        });
+      }
+    });
+
+    return Array.from(mergedMap.values());
+  };
+
   const getGuestCart = () => {
-    return JSON.parse(
-      localStorage.getItem("guestCart") || "[]"
+    return normalizeGuestCartItems(
+      JSON.parse(localStorage.getItem("guestCart") || "[]")
     );
   };
 
   // ==========================
   // LOAD CART
   // ==========================
-  const refreshCart = async () => {
+  const refreshCart = useCallback(async () => {
     try {
       const token = localStorage.getItem("token");
 
       if (token) {
         const data = await getCart();
         updateCartState(data);
+
+        const guestItems = getGuestCart();
+        if (guestItems.length > 0) {
+          try {
+            const mergedData = await mergeCartAPI(guestItems);
+            if (mergedData?.cart) {
+              updateCartState(mergedData.cart);
+            }
+
+            if (typeof window !== "undefined") {
+              localStorage.removeItem("guestCart");
+            }
+            window.dispatchEvent(new Event("cart:updated"));
+          } catch (mergeError) {
+            console.log("MERGE GUEST CART ERROR", mergeError);
+          }
+        }
       } else {
         const items = getGuestCart();
+        if (typeof window !== "undefined") {
+          localStorage.setItem("guestCart", JSON.stringify(items));
+        }
         updateCartState({ items });
       }
     } catch (error) {
@@ -155,10 +236,64 @@ export function CartProvider({
     } finally {
       setLoading(false);
     }
-  };
+  }, [updateCartState]);
 
   useEffect(() => {
     refreshCart();
+  }, [authToken, refreshCart]);
+
+  useEffect(() => {
+    const normalizedItems = normalizeCartItems(cart.items || []);
+    const currentItems = cart.items || [];
+
+    const hasChanged =
+      normalizedItems.length !== currentItems.length ||
+      normalizedItems.some((item: any, index: number) => {
+        const currentItem = currentItems[index];
+        return (
+          Number(item.quantity || 0) !== Number(currentItem?.quantity || 0) ||
+          getProductId(item.product) !== getProductId(currentItem?.product)
+        );
+      });
+
+    if (hasChanged) {
+      const total = normalizedItems.reduce(
+        (sum: number, item: any) => sum + item.price * item.quantity,
+        0
+      );
+      const totalItems = normalizedItems.reduce(
+        (sum: number, item: any) => sum + Number(item.quantity || 0),
+        0
+      );
+
+      setCart((prev: any) => ({
+        ...prev,
+        items: normalizedItems,
+        total,
+        totalItems,
+      }));
+    }
+  }, [cart.items, getProductId, normalizeCartItems]);
+
+  useEffect(() => {
+    const syncAuthToken = () => {
+      setAuthToken(localStorage.getItem("token"));
+    };
+
+    const handleAuthChange = () => {
+      syncAuthToken();
+    };
+
+    syncAuthToken();
+    window.addEventListener("storage", syncAuthToken);
+    window.addEventListener("focus", syncAuthToken);
+    window.addEventListener("auth-change", handleAuthChange);
+
+    return () => {
+      window.removeEventListener("storage", syncAuthToken);
+      window.removeEventListener("focus", syncAuthToken);
+      window.removeEventListener("auth-change", handleAuthChange);
+    };
   }, []);
 
   // ==========================
@@ -186,15 +321,15 @@ export function CartProvider({
       else {
         const items = getGuestCart();
 
-        const exist = items.find(
-          (item: any) =>
-            (item.product?._id || item.product) === productId
+        const normalizedItems = [...items];
+        const existing = normalizedItems.find(
+          (item: any) => getProductId(item.product) === productId
         );
 
-        if (exist) {
-          exist.quantity += quantity;
+        if (existing) {
+          existing.quantity += quantity;
         } else {
-          items.push({
+          normalizedItems.push({
             product: typeof product === "object" ? product : {
               _id: productId,
               name: "Product",
@@ -206,9 +341,11 @@ export function CartProvider({
           });
         }
 
-        saveGuestCart(items);
-        updateCartState({ items });
+        saveGuestCart(normalizedItems);
+        updateCartState({ items: normalizedItems });
       }
+
+      window.dispatchEvent(new Event("cart:updated"));
     } catch (error) {
       console.log("ADD CART ERROR", error);
     } finally {
@@ -237,18 +374,19 @@ export function CartProvider({
       } else {
         const items = getGuestCart();
 
-        const item = items.find(
-          (i: any) =>
-            (i.product?._id || i.product) === productId
+        const normalizedItems = [...items];
+        const item = normalizedItems.find(
+          (i: any) => getProductId(i.product) === productId
         );
 
         if (item) {
           item.quantity = quantity;
         }
-
-        saveGuestCart(items);
-        updateCartState({ items });
+        saveGuestCart(normalizedItems);
+        updateCartState({ items: normalizedItems });
       }
+
+      window.dispatchEvent(new Event("cart:updated"));
     } catch (error) {
       console.log("UPDATE CART ERROR", error);
     } finally {
@@ -271,15 +409,15 @@ export function CartProvider({
         const data = await removeCartAPI(productId);
         updateCartState(data);
       } else {
-        const items = getGuestCart()
-          .filter(
-            (item: any) =>
-              (item.product?._id || item.product) !== productId
-          );
-
-        saveGuestCart(items);
-        updateCartState({ items });
+        const items = getGuestCart();
+        const normalizedItems = items.filter(
+          (item: any) => getProductId(item.product) !== productId
+        );
+        saveGuestCart(normalizedItems);
+        updateCartState({ items: normalizedItems });
       }
+
+      window.dispatchEvent(new Event("cart:updated"));
     } catch (error) {
       console.log("REMOVE CART ERROR", error);
     } finally {
@@ -304,7 +442,10 @@ export function CartProvider({
 
       setCart({
         items: [],
+        total: 0,
+        totalItems: 0,
       });
+      window.dispatchEvent(new Event("cart:updated"));
     } catch (error) {
       console.log("CLEAR CART ERROR", error);
     } finally {

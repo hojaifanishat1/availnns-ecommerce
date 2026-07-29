@@ -13,6 +13,7 @@ import {
   FolderTree,
   Zap,
   Truck,
+  Trash2,
 } from "lucide-react";
 import { Product } from "@/types/product";
 import useCart from "@/hooks/useCart";
@@ -43,12 +44,17 @@ export default function ProductCard({
   const primaryImage = product.images?.[0]?.url || "/placeholder.png";
   const secondaryImage = product.images?.[1]?.url || primaryImage;
 
-  const cartItem = cart?.items?.find(
-    (item: any) =>
-      item.product?._id === product._id || item.product === product._id
-  );
+  const cartItem = cart?.items?.find((item: any) => {
+    const itemProduct = item.product || {};
+    const itemProductId =
+      typeof itemProduct === "string"
+        ? itemProduct
+        : itemProduct._id?.toString() || itemProduct.id?.toString();
 
-  const quantity = cartItem?.quantity || 0;
+    return itemProductId === product._id?.toString();
+  });
+
+  const quantity = Number(cartItem?.quantity || 0);
 
   const regularPrice = product.price;
   const salePrice =
@@ -250,8 +256,9 @@ export default function ProductCard({
                   type="button"
                   onClick={handleDecreaseCart}
                   className="cursor-pointer text-zinc-300 hover:text-white transition"
+                  title={quantity <= 1 ? "Remove from cart" : "Decrease quantity"}
                 >
-                  <Minus size={14} />
+                  {quantity <= 1 ? <Trash2 size={14} /> : <Minus size={14} />}
                 </button>
                 <span className="font-bold text-xs min-w-[14px] text-center">
                   {quantity}
@@ -313,9 +320,9 @@ export default function ProductCard({
       {/* Footer Info Slider (Fixed Height & Perfect Vertical Center) */}
       <div className="mt-3 pt-2.5 border-t border-gray-100 px-1 overflow-hidden h-7 relative flex items-center">
         <div
-          className={`absolute inset-x-1 flex flex-col ${
+          className={`absolute left-0 right-0 top-0 flex flex-col ${
             isTransitioning ? "transition-transform duration-500 ease-in-out" : ""
-          }`}
+          } will-change-transform`}
           style={{
             transform: `translateY(-${currentIndex * 28}px)`,
           }}

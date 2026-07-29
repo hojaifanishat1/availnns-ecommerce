@@ -45,10 +45,21 @@ export default function ProductInfo({
         )
       : 0;
 
+  const salePrice =
+    product.discountPrice && product.discountPrice > 0
+      ? product.discountPrice
+      : product.price;
+
   const handleAddToCart = async () => {
     try {
       setAdding(true);
-      await addItem(product._id, quantity);
+      // সাইজ ও কালারসহ প্রডাক্ট অবজেক্ট তৈরি করে পাস করা হচ্ছে
+      const productWithSelections = {
+        ...product,
+        selectedSize,
+        selectedColor,
+      };
+      await addItem(productWithSelections, quantity);
       router.push("/cart");
     } catch (error) {
       console.log(error);
@@ -59,7 +70,12 @@ export default function ProductInfo({
 
   const buyNow = async () => {
     try {
-      await addItem(product._id, quantity);
+      const productWithSelections = {
+        ...product,
+        selectedSize,
+        selectedColor,
+      };
+      await addItem(productWithSelections, quantity);
       router.push("/checkout");
     } catch (error) {
       console.log(error);
@@ -132,11 +148,7 @@ export default function ProductInfo({
       {/* PRICE */}
       <div className="flex items-center gap-3 flex-wrap bg-zinc-50 border border-zinc-200/80 p-4 rounded-2xl">
         <h2 className="text-3xl sm:text-4xl font-black text-zinc-900">
-          {formatPrice(
-            product.discountPrice && product.discountPrice > 0
-              ? product.discountPrice
-              : product.price
-          )}
+          {formatPrice(salePrice)}
         </h2>
 
         {product.discountPrice > 0 && (

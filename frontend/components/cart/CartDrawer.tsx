@@ -1,6 +1,7 @@
 "use client";
 
 
+import { useEffect } from "react";
 import Image from "next/image";
 import Link from "next/link";
 
@@ -40,6 +41,25 @@ onClose,
 
 }:Props){
 
+
+
+useEffect(() => {
+  if (!open) return;
+
+  const handleKeyDown = (event: KeyboardEvent) => {
+    if (event.key === "Escape") {
+      onClose();
+    }
+  };
+
+  document.body.style.overflow = "hidden";
+  document.addEventListener("keydown", handleKeyDown);
+
+  return () => {
+    document.body.style.overflow = "";
+    document.removeEventListener("keydown", handleKeyDown);
+  };
+}, [open, onClose]);
 
 
 const {
@@ -109,9 +129,11 @@ onClick={onClose}
 className="
 fixed
 inset-0
-z-40
+z-[60]
 bg-black/40
 backdrop-blur-sm
+transition-opacity
+duration-300
 "
 
 />
@@ -131,14 +153,19 @@ className="
 fixed
 right-0
 top-0
-z-50
+z-[70]
 flex
-h-screen
+h-[100dvh]
 w-full
 max-w-md
 flex-col
 bg-white
 shadow-2xl
+transition-transform
+duration-300
+translate-x-0
+overflow-hidden
+pb-20
 "
 
 >
@@ -227,7 +254,9 @@ className="
 flex-1
 space-y-4
 overflow-y-auto
+overflow-x-hidden
 p-5
+min-h-0
 "
 
 >
@@ -337,9 +366,11 @@ item.product || item;
 
 const productId =
 
-product._id ||
+(typeof product === "string"
+  ? product
+  : product?._id || product?.id || item?.productId || item?.product?.toString?.()) ||
 
-item.productId;
+null;
 
 
 
@@ -516,25 +547,16 @@ border
 
 <button
 
-onClick={()=>
+onClick={() => {
+  if (!productId) return;
 
+  if (item.quantity <= 1) {
+    removeItem(productId);
+    return;
+  }
 
-updateItem(
-
-productId,
-
-Math.max(
-
-1,
-
-item.quantity-1
-
-)
-
-)
-
-
-}
+  updateItem(productId, item.quantity - 1);
+}}
 
 className="
 flex
@@ -674,6 +696,7 @@ className="
 border-t
 bg-white
 p-5
+shrink-0
 "
 
 >

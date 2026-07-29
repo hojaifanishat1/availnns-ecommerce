@@ -2,6 +2,34 @@ import { Request, Response } from "express";
 import Cart from "../models/Cart";
 import Product from "../models/Product";
 
+const normalizeCartItems = (items: any[] = []) => {
+  const mergedMap = new Map();
+
+  (items || []).forEach((item: any) => {
+    const rawProduct = item.product;
+    const productId = rawProduct?._id
+      ? rawProduct._id.toString()
+      : rawProduct?.toString();
+
+    if (!productId) return;
+
+    const quantity = Number(item.quantity || 1);
+
+    if (mergedMap.has(productId)) {
+      const existing = mergedMap.get(productId);
+      existing.quantity += quantity;
+    } else {
+      mergedMap.set(productId, {
+        ...item,
+        product: rawProduct,
+        quantity,
+      });
+    }
+  });
+
+  return Array.from(mergedMap.values());
+};
+
 // ===============================
 // GET USER CART
 // ===============================
@@ -18,6 +46,14 @@ export const getCart = async (req: Request, res: Response): Promise<void> => {
         total: 0,
       });
     }
+
+    cart.items = normalizeCartItems(cart.items) as any;
+    cart.total = cart.items.reduce(
+      (sum: number, item: any) => sum + item.price * item.quantity,
+      0
+    );
+
+    await cart.save();
 
     res.status(200).json({
       success: true,
@@ -97,6 +133,8 @@ export const addToCart = async (req: Request, res: Response): Promise<void> => {
       } as any);
     }
 
+    cart.items = normalizeCartItems(cart.items) as any;
+
     cart.total = cart.items.reduce(
       (sum: number, item: any) => sum + item.price * item.quantity,
       0
@@ -160,6 +198,8 @@ export const updateCartItem = async (req: Request, res: Response): Promise<void>
       });
     }
 
+    cart.items = normalizeCartItems(cart.items) as any;
+
     cart.total = cart.items.reduce(
       (sum: number, item: any) => sum + item.price * item.quantity,
       0
@@ -203,6 +243,8 @@ export const removeCartItem = async (req: Request, res: Response): Promise<void>
       const itemProdId = item.product?._id ? item.product._id.toString() : item.product?.toString();
       return itemProdId !== String(productId);
     });
+
+    cart.items = normalizeCartItems(cart.items) as any;
 
     cart.total = cart.items.reduce(
       (sum: number, item: any) => sum + item.price * item.quantity,

@@ -26,6 +26,7 @@ import uploadRoutes from "./upload.routes";
 import notificationRoutes from "./notification.routes";
 
 import phoneOtpRoutes from "./phoneOtp.routes";
+import bannerRoutes from "./banner.routes"; // ব্যানার রাউট ইমপোর্ট করা হলো
 
 const router = Router();
 
@@ -43,6 +44,9 @@ router.use("/admin", adminRoutes);
 router.use("/admin/dashboard", adminDashboardRoutes);
 router.use("/admin/orders", adminOrderRoutes);
 router.use("/admin/notifications", adminNotificationRoutes);
+
+// BANNERS (পাবলিক এবং অ্যাডমিন ব্যানার রুট)
+router.use("/banners", bannerRoutes);
 
 // SETTINGS
 router.use("/settings", settingsRoutes);

@@ -37,6 +37,10 @@ import {
   useAuth
 } from "@/context/AuthContext";
 
+import {
+  useCurrency
+} from "@/context/CurrencyContext";
+
 
 
 interface UserData {
@@ -92,6 +96,10 @@ export default function DashboardPage(){
 const {
   logout
 }=useAuth();
+
+const {
+  formatPrice
+}=useCurrency();
 
 
 
@@ -808,13 +816,12 @@ mt-5
 "
 >
 
-$
 {
-Number(
+formatPrice(
 stats?.credits ??
 stats?.totalSpent ??
 0
-).toFixed(2)
+)
 }
 
 </p>

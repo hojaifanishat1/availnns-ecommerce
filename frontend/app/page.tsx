@@ -7,8 +7,7 @@ import DealProducts from "@/components/home/DealProducts";
 
 export default function HomePage() {
   return (
-    <main>
-
+    <div className="pt-12 sm:pt-16">
       <Hero />
 
       <NewArrivals />
@@ -18,7 +17,6 @@ export default function HomePage() {
       <FeaturedProducts />
 
       <DealProducts />
-
-    </main>
+    </div>
   );
 }

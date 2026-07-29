@@ -20,7 +20,9 @@ return (
 <footer className="
 bg-zinc-950
 text-white
-mt-20
+mt-24
+pb-24
+sm:pb-20
 ">
 
 
@@ -301,10 +303,10 @@ Dhaka, Bangladesh
 
 
 <div className="
-mt-14
+mt-16
 border-t
 border-white/10
-pt-6
+pt-8
 text-center
 text-sm
 text-gray-500
