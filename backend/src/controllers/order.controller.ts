@@ -116,7 +116,7 @@ export const createOrder = async (req: Request, res: Response): Promise<void> =>
     );
 
     // ===============================
-    // DELIVERY ZONE
+    // DELIVERY ZONE & FREE DELIVERY CHECK
     // ===============================
     let deliveryFee = 0;
     let deliveryZoneName = "Standard Delivery";
@@ -128,7 +128,15 @@ export const createOrder = async (req: Request, res: Response): Promise<void> =>
       if (zone) {
         zoneId = zone._id;
         deliveryZoneName = zone.name;
-        deliveryFee = zone.deliveryFee;
+        
+        const baseFee = Number(zone.deliveryFee) || 0;
+        const freeDeliveryAbove = Number((zone as any).freeDeliveryAbove) || 0;
+
+        if (freeDeliveryAbove > 0 && subtotal >= freeDeliveryAbove) {
+          deliveryFee = 0;
+        } else {
+          deliveryFee = baseFee;
+        }
       }
     }
 
@@ -181,10 +189,9 @@ export const createOrder = async (req: Request, res: Response): Promise<void> =>
     }
 
     // ===============================
-    // TAX + TOTAL
+    // TOTAL (TAX REMOVED)
     // ===============================
-    const tax = subtotal * 0.05; // ৫% ট্যাক্স
-    const totalPrice = Math.max(0, subtotal + deliveryFee + tax - discountAmount);
+    const totalPrice = Math.max(0, subtotal + deliveryFee - discountAmount);
 
     // ===============================
     // CREATE ORDER
@@ -221,7 +228,7 @@ export const createOrder = async (req: Request, res: Response): Promise<void> =>
           },
           orderStatus: "pending",
           subtotal,
-          tax,
+          tax: 0,
           discountAmount,
           totalPrice,
           couponCode: couponCode ? couponCode.toUpperCase() : ""

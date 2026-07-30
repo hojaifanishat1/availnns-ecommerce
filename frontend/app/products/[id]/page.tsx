@@ -3,7 +3,7 @@
 import { useEffect, useState } from "react";
 import { notFound } from "next/navigation";
 import Link from "next/link";
-import { ChevronRight, Home, ShieldCheck, RefreshCw, Truck, Clock, MapPin, Zap, CheckCircle2, XCircle } from "lucide-react";
+import { ChevronRight, Home, ShieldCheck, RefreshCw, Truck, Clock, MapPin, Zap, CheckCircle, XCircle, Star } from "lucide-react";
 
 import {
   getProductById,
@@ -14,6 +14,7 @@ import {
 } from "@/services/product.service";
 
 import { getDeliveryZones } from "@/services/deliveryZone.service";
+import api from "@/services/api";
 
 import { Product } from "@/types/product";
 
@@ -34,13 +35,30 @@ export default function ProductDetailsPage({
   const [bestSeller, setBestSeller] = useState<Product[]>([]);
   const [topPicks, setTopPicks] = useState<Product[]>([]);
   
-  // Location & Zone States
-  const [regularZone, setRegularZone] = useState<any>(null);
+  // Location & Zone States (Info Only)
+  const [matchedRegularZone, setMatchedRegularZone] = useState<any>(null);
+  const [matchedExpressZone, setMatchedExpressZone] = useState<any>(null);
   const [expressAvailable, setExpressAvailable] = useState<boolean>(false);
-  const [expressZoneInfo, setExpressZoneInfo] = useState<any>(null);
   const [zonesLoading, setZonesLoading] = useState(true);
 
+  // Review States
+  const [reviews, setReviews] = useState<any[]>([]);
+  const [rating, setRating] = useState(5);
+  const [comment, setComment] = useState("");
+  const [reviewLoading, setReviewLoading] = useState(false);
+  const [reviewError, setReviewError] = useState("");
+  const [reviewSuccess, setReviewSuccess] = useState("");
+
   const [loading, setLoading] = useState(true);
+
+  const fetchReviews = async (productId: string) => {
+    try {
+      const res = await api.get(`/reviews/product/${productId}`);
+      setReviews(res.data.reviews || res.data || []);
+    } catch (e) {
+      console.log("Error loading reviews", e);
+    }
+  };
 
   useEffect(() => {
     const load = async () => {
@@ -72,6 +90,7 @@ export default function ProductDetailsPage({
         }
 
         setProduct(currentProduct);
+        await fetchReviews(id);
 
         setRelated(
           relatedRes.filter((item: Product) => item._id !== id).slice(0, 4)
@@ -91,7 +110,6 @@ export default function ProductDetailsPage({
           activeZones = zonesRes.filter((z: any) => z.active);
         }
 
-        // Match user location with active delivery zones silently
         const localData = localStorage.getItem("user_addresses");
         let matchedAddr: any = null;
 
@@ -108,39 +126,41 @@ export default function ProductDetailsPage({
           }
         }
 
-        const addrCity = matchedAddr?.city?.toLowerCase() || "";
-        const addrArea = (matchedAddr?.street || matchedAddr?.location?.formattedAddress || "").toLowerCase();
+        const district = (matchedAddr?.city || matchedAddr?.district || "").toLowerCase();
+        const area = (matchedAddr?.street || matchedAddr?.location?.formattedAddress || "").toLowerCase();
 
-        // 1. Regular Zone Matching
-        const foundRegular = activeZones.find((zone) => {
-          const zName = zone.name.toLowerCase();
-          const isExpress = zName.includes("3 hours") || zName.includes("[3 hours]");
-          if (isExpress) return false;
-          return zName.includes(addrCity) || (addrArea && zName.includes(addrArea));
-        });
+        const checkIsExpress = (zone: any) => {
+          const zName = (zone.name || "").toLowerCase();
+          const zDays = (zone.estimatedDays || "").toLowerCase();
+          return zName.includes("3 hour") || zName.includes("express") || zDays.includes("3 hour");
+        };
 
-        if (foundRegular) {
-          setRegularZone(foundRegular);
-        } else if (activeZones.length > 0) {
-          // Fallback to first non-express or any active zone
-          const fallback = activeZones.find(z => !z.name.toLowerCase().includes("3 hours")) || activeZones[0];
-          setRegularZone(fallback);
-        }
+        const matchesLocation = (zone: any) => {
+          const zName = (zone.name || "").toLowerCase();
+          if (!district && !area) return true;
+          return (district && zName.includes(district)) || (area && zName.includes(area)) || zName.includes("kishoreganj");
+        };
 
-        // 2. Express Zone Matching (3 hours)
         const foundExpress = activeZones.find((zone) => {
-          const zName = zone.name.toLowerCase();
-          const isExpress = zName.includes("3 hours") || zName.includes("[3 hours]");
-          if (!isExpress) return false;
-          return zName.includes(addrCity) || (addrArea && zName.includes(addrArea));
+          return checkIsExpress(zone) && matchesLocation(zone);
         });
 
-        if (foundExpress) {
+        const finalExpress = foundExpress || activeZones.find(z => checkIsExpress(z));
+
+        if (finalExpress) {
           setExpressAvailable(true);
-          setExpressZoneInfo(foundExpress);
+          setMatchedExpressZone(finalExpress);
         } else {
           setExpressAvailable(false);
+          setMatchedExpressZone(null);
         }
+
+        const foundRegular = activeZones.find((zone) => {
+          return !checkIsExpress(zone) && matchesLocation(zone);
+        });
+
+        const finalRegular = foundRegular || activeZones.find(z => !checkIsExpress(z)) || activeZones[0];
+        setMatchedRegularZone(finalRegular);
 
       } catch (error) {
         console.log("Product details error:", error);
@@ -152,6 +172,44 @@ export default function ProductDetailsPage({
 
     load();
   }, [params]);
+
+  const handleReviewSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setReviewError("");
+    setReviewSuccess("");
+
+    if (!comment.trim()) {
+      setReviewError("Please write a comment.");
+      return;
+    }
+
+    try {
+      setReviewLoading(true);
+      const token = localStorage.getItem("token");
+      if (!token) {
+        setReviewError("Please login to submit a review.");
+        return;
+      }
+
+      await api.post("/reviews", {
+        productId: product?._id,
+        rating,
+        comment,
+      }, {
+        headers: { Authorization: `Bearer ${token}` }
+      });
+
+      setReviewSuccess("Review submitted successfully!");
+      setComment("");
+      if (product?._id) {
+        fetchReviews(product._id);
+      }
+    } catch (err: any) {
+      setReviewError(err.response?.data?.message || "Failed to submit review");
+    } finally {
+      setReviewLoading(false);
+    }
+  };
 
   if (loading) {
     return (
@@ -175,6 +233,10 @@ export default function ProductDetailsPage({
   const categoryId = typeof product.category === "object" && product.category !== null 
     ? (product.category as any)._id 
     : product.category;
+
+  // Fee Calculations
+  const regularFeeAmount = Number(matchedRegularZone?.deliveryFee) ?? 60;
+  const expressFeeAmount = Number(matchedExpressZone?.expressFee ?? matchedExpressZone?.expressDeliveryFee ?? matchedExpressZone?.charge ?? 50);
 
   return (
     <main className="min-h-screen bg-gray-50/50 py-8 lg:py-12">
@@ -213,67 +275,82 @@ export default function ProductDetailsPage({
             <div>
               <ProductInfo product={product} />
 
-              {/* Delivery Information 2 Boxes Widget */}
-              <div className="mt-6 rounded-2xl border border-gray-100 bg-gray-50/70 p-4 space-y-3">
-                <div className="flex items-center gap-2 text-xs font-bold uppercase tracking-wider text-gray-600">
-                  <Truck size={16} className="text-black" />
-                  <span>Delivery Information</span>
+              {/* Delivery Information Widget (Info Only Style) */}
+              <div className="mt-6 rounded-2xl border border-zinc-200/80 bg-zinc-50/70 p-4 space-y-3">
+                <div className="flex items-center justify-between border-b border-zinc-200/60 pb-2.5">
+                  <div className="flex items-center gap-2 text-xs font-bold uppercase tracking-wider text-zinc-900">
+                    <Truck size={16} className="text-black" />
+                    <span>Delivery Information</span>
+                  </div>
                 </div>
 
                 {zonesLoading ? (
-                  <div className="text-xs text-gray-400">Checking delivery details...</div>
+                  <div className="text-xs text-zinc-400">Checking delivery details...</div>
                 ) : (
-                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5 pt-1 text-xs">
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 pt-1 text-xs">
                     
-                    {/* Box 1: Regular Delivery */}
-                    <div className="bg-white p-3 rounded-2xl border border-gray-100 flex flex-col justify-between gap-2 shadow-2xs">
+                    {/* Regular Delivery Info */}
+                    <div className="p-3.5 rounded-xl border border-zinc-200 bg-white shadow-sm flex flex-col justify-between gap-2">
                       <div className="flex items-center justify-between">
-                        <span className="font-bold text-gray-800 flex items-center gap-1">
-                          <Truck size={14} className="text-blue-600" /> Regular
+                        <span className="font-bold text-xs text-zinc-900 flex items-center gap-1.5">
+                          <Truck size={14} className="text-blue-600" /> Regular Delivery
                         </span>
-                        <span className="text-[10px] bg-blue-50 text-blue-700 font-semibold px-2 py-0.5 rounded-md">
-                          Available
+                        <span className="text-[9px] bg-blue-50 text-blue-700 font-bold px-2 py-0.5 rounded tracking-wide">
+                          STANDARD
                         </span>
                       </div>
-                      <div className="text-[11px] text-gray-500 space-y-0.5">
-                        <p className="flex items-center gap-1">
-                          <Clock size={12} className="text-gray-400" /> Time: <strong className="text-gray-800">{regularZone?.estimatedDays || "3-5 Days"}</strong>
+                      <div className="text-[11px] text-zinc-600 space-y-1">
+                        <p className="flex items-center gap-1.5">
+                          <Clock size={12} className="text-zinc-400" /> Estimated: <strong className="text-zinc-900">{matchedRegularZone?.estimatedDays || "3-5 Days"}</strong>
                         </p>
-                        <p className="flex items-center gap-1">
-                          <MapPin size={12} className="text-gray-400" /> Fee: <strong className="text-gray-800">{regularZone?.deliveryFee === 0 ? "Free" : `৳${regularZone?.deliveryFee || 60}`}</strong>
+                        <p className="flex items-center gap-1.5">
+                          <MapPin size={12} className="text-zinc-400" /> Delivery Fee:{" "}
+                          <strong className="text-zinc-900">
+                            {regularFeeAmount === 0 ? (
+                              <span className="text-emerald-600 font-bold">FREE</span>
+                            ) : (
+                              `৳${regularFeeAmount}`
+                            )}
+                          </strong>
                         </p>
                       </div>
                     </div>
 
-                    {/* Box 2: Express Delivery */}
-                    <div className={`bg-white p-3 rounded-2xl border flex flex-col justify-between gap-2 shadow-2xs ${expressAvailable ? "border-purple-200 bg-purple-50/20" : "border-gray-100 opacity-80"}`}>
+                    {/* Express Delivery Info */}
+                    <div className={`p-3.5 rounded-xl border border-zinc-200 bg-white shadow-sm flex flex-col justify-between gap-2 ${!expressAvailable ? "opacity-60 bg-zinc-50/50" : ""}`}>
                       <div className="flex items-center justify-between">
-                        <span className="font-bold text-gray-800 flex items-center gap-1">
-                          <Zap size={14} className="text-purple-600" /> Express (3H)
+                        <span className="font-bold text-xs text-zinc-900 flex items-center gap-1.5">
+                          <Zap size={14} className="text-amber-500 fill-amber-500" /> Express (3 Hours)
                         </span>
                         {expressAvailable ? (
-                          <span className="text-[10px] bg-purple-100 text-purple-700 font-bold px-2 py-0.5 rounded-md flex items-center gap-0.5">
-                            <CheckCircle2 size={11} /> Available
+                          <span className="text-[9px] bg-amber-100 text-amber-800 font-bold px-2 py-0.5 rounded flex items-center gap-0.5">
+                            <CheckCircle size={10} /> AVAILABLE
                           </span>
                         ) : (
-                          <span className="text-[10px] bg-gray-100 text-gray-500 font-medium px-2 py-0.5 rounded-md flex items-center gap-0.5">
-                            <XCircle size={11} /> Not Available
+                          <span className="text-[9px] bg-zinc-200 text-zinc-600 font-medium px-2 py-0.5 rounded flex items-center gap-0.5">
+                            <XCircle size={10} /> UNAVAILABLE
                           </span>
                         )}
                       </div>
-                      <div className="text-[11px] text-gray-500 space-y-0.5">
+                      <div className="text-[11px] text-zinc-600 space-y-1">
                         {expressAvailable ? (
                           <>
-                            <p className="flex items-center gap-1">
-                              <Clock size={12} className="text-purple-500" /> Time: <strong className="text-gray-800">{expressZoneInfo?.estimatedDays || "Within 3 Hours"}</strong>
+                            <p className="flex items-center gap-1.5">
+                              <Clock size={12} className="text-amber-500" /> Estimated: <strong className="text-zinc-900">{matchedExpressZone?.estimatedDays || "Within 3 Hours"}</strong>
                             </p>
-                            <p className="flex items-center gap-1">
-                              <MapPin size={12} className="text-purple-500" /> Fee: <strong className="text-gray-800">{expressZoneInfo?.deliveryFee === 0 ? "Free" : `৳${expressZoneInfo?.deliveryFee || 100}`}</strong>
+                            <p className="flex items-center gap-1.5">
+                              <MapPin size={12} className="text-amber-500" /> Delivery Fee:{" "}
+                              <strong className="text-zinc-900">
+                                {regularFeeAmount === 0 ? <span className="text-emerald-600 font-bold">FREE</span> : `৳${regularFeeAmount}`}
+                              </strong>
+                            </p>
+                            <p className="flex items-center gap-1.5">
+                              <Zap size={12} className="text-amber-500" /> Express Fee: <strong className="text-zinc-900">৳{expressFeeAmount}</strong>
                             </p>
                           </>
                         ) : (
-                          <p className="text-[11px] text-gray-400 italic py-1">
-                            Not supported for your current location.
+                          <p className="text-[10px] text-zinc-400 italic py-1">
+                            Not supported for your region.
                           </p>
                         )}
                       </div>
@@ -300,6 +377,76 @@ export default function ProductDetailsPage({
               </div>
             </div>
           </div>
+        </section>
+
+        {/* Customer Reviews Section */}
+        <section className="mt-12 bg-white rounded-3xl p-6 sm:p-8 lg:p-10 border border-gray-100 shadow-sm space-y-8">
+          <h3 className="text-base font-bold text-zinc-900 uppercase tracking-tight">Customer Reviews</h3>
+
+          {/* Existing Reviews List */}
+          <div className="space-y-4">
+            {reviews && reviews.length > 0 ? (
+              reviews.map((rev: any) => (
+                <div key={rev._id} className="p-4 rounded-2xl border border-gray-100 bg-gray-50/50 space-y-2">
+                  <div className="flex items-center justify-between">
+                    <span className="font-bold text-xs text-zinc-900">{rev.user?.name || "Anonymous User"}</span>
+                    <div className="flex items-center gap-1">
+                      {[...Array(5)].map((_, i) => (
+                        <Star
+                          key={i}
+                          size={12}
+                          className={i < rev.rating ? "text-amber-500 fill-amber-500" : "text-gray-300"}
+                        />
+                      ))}
+                    </div>
+                  </div>
+                  <p className="text-xs text-zinc-600">{rev.comment}</p>
+                </div>
+              ))
+            ) : (
+              <p className="text-xs text-gray-400 italic">No reviews yet. Be the first to review this product!</p>
+            )}
+          </div>
+
+          {/* Add Review Form */}
+          <form onSubmit={handleReviewSubmit} className="p-6 rounded-2xl border border-gray-100 bg-gray-50/30 space-y-4">
+            <h4 className="text-xs font-bold uppercase text-zinc-900">Write a Review</h4>
+
+            <div className="flex items-center gap-2">
+              <span className="text-xs font-medium text-zinc-600">Rating:</span>
+              <div className="flex items-center gap-1 cursor-pointer">
+                {[1, 2, 3, 4, 5].map((star) => (
+                  <Star
+                    key={star}
+                    size={18}
+                    onClick={() => setRating(star)}
+                    className={star <= rating ? "text-amber-500 fill-amber-500" : "text-gray-300"}
+                  />
+                ))}
+              </div>
+            </div>
+
+            <div className="space-y-1">
+              <textarea
+                rows={3}
+                value={comment}
+                onChange={(e) => setComment(e.target.value)}
+                placeholder="Write your feedback about the product..."
+                className="w-full rounded-xl border border-gray-200 p-3 text-xs focus:outline-none focus:ring-1 focus:ring-black bg-white"
+              />
+            </div>
+
+            {reviewError && <p className="text-xs text-red-600 font-semibold">{reviewError}</p>}
+            {reviewSuccess && <p className="text-xs text-emerald-600 font-semibold">{reviewSuccess}</p>}
+
+            <button
+              type="submit"
+              disabled={reviewLoading}
+              className="bg-black text-white px-5 py-2.5 rounded-xl text-xs font-bold hover:bg-zinc-800 transition-all shadow-sm active:scale-95"
+            >
+              {reviewLoading ? "Submitting..." : "Submit Review"}
+            </button>
+          </form>
         </section>
 
         {/* Product Recommendations Sections */}

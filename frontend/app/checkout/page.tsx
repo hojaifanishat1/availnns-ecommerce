@@ -66,10 +66,8 @@ export default function CheckoutPage() {
     setZones
   ] = useState<any[]>([]);
   
-  // Modal / Map Popup State for Add New Location
   const [showLocationModal, setShowLocationModal] = useState<boolean>(false);
 
-  // জোন ও ডেলিভারি টাইপ স্টেট
   const [matchedRegularZone, setMatchedRegularZone] = useState<any>(null);
   const [matchedExpressZone, setMatchedExpressZone] = useState<any>(null);
   const [expressAvailable, setExpressAvailable] = useState<boolean>(false);
@@ -100,6 +98,13 @@ export default function CheckoutPage() {
     }
   });
 
+  const subtotal = useMemo(() => {
+    return items.reduce((acc: number, item: any) => {
+      const price = item?.product?.discountPrice || item?.product?.price || item?.price || 0;
+      return acc + price * item.quantity;
+    }, 0);
+  }, [items]);
+
   // =====================
   // PROCESS ZONES BASED ON LOCATION
   // =====================
@@ -109,30 +114,27 @@ export default function CheckoutPage() {
     const district = (loc.district || "").toLowerCase();
     const area = (loc.area || loc.formattedAddress || "").toLowerCase();
 
-    // 1. Regular Zone Matching
-    const foundRegular = allZones.find((zone) => {
-      const zName = zone.name.toLowerCase();
-      const isExpress = zName.includes("3 hours") || zName.includes("[3 hours]");
-      if (isExpress) return false;
-      return zName.includes(district) || (area && zName.includes(area));
-    });
+    const checkIsExpress = (zone: any) => {
+      const zName = (zone.name || "").toLowerCase();
+      const zDays = (zone.estimatedDays || "").toLowerCase();
+      return zName.includes("3 hour") || zName.includes("express") || zDays.includes("3 hour");
+    };
 
-    const finalRegular = foundRegular || allZones.find(z => !z.name.toLowerCase().includes("3 hours")) || allZones[0];
-    setMatchedRegularZone(finalRegular);
+    const matchesLocation = (zone: any) => {
+      const zName = (zone.name || "").toLowerCase();
+      if (!district && !area) return true;
+      return (district && zName.includes(district)) || (area && zName.includes(area)) || zName.includes("kishoreganj");
+    };
 
-    // 2. Express Zone Matching (3 hours)
     const foundExpress = allZones.find((zone) => {
-      const zName = zone.name.toLowerCase();
-      const isExpress = zName.includes("3 hours") || zName.includes("[3 hours]");
-      if (!isExpress) return false;
-      return zName.includes(district) || (area && zName.includes(area));
+      return checkIsExpress(zone) && matchesLocation(zone);
     });
 
-    let activeExpressAvailable = false;
-    if (foundExpress) {
-      activeExpressAvailable = true;
+    const finalExpress = foundExpress || allZones.find(z => checkIsExpress(z));
+
+    if (finalExpress) {
       setExpressAvailable(true);
-      setMatchedExpressZone(foundExpress);
+      setMatchedExpressZone(finalExpress);
     } else {
       setExpressAvailable(false);
       setMatchedExpressZone(null);
@@ -141,8 +143,15 @@ export default function CheckoutPage() {
       }
     }
 
-    const activeSelectedZone = (currentDeliveryType === "express" && activeExpressAvailable && foundExpress) 
-      ? foundExpress._id 
+    const foundRegular = allZones.find((zone) => {
+      return !checkIsExpress(zone) && matchesLocation(zone);
+    });
+
+    const finalRegular = foundRegular || allZones.find(z => !checkIsExpress(z)) || allZones[0];
+    setMatchedRegularZone(finalRegular);
+
+    const activeSelectedZone = (currentDeliveryType === "express" && finalExpress) 
+      ? finalExpress._id 
       : finalRegular?._id;
       
     if (activeSelectedZone) {
@@ -178,7 +187,6 @@ export default function CheckoutPage() {
           googleMapLink: userData?.googleMapLink || "",
         };
 
-        // Check local storage addresses if available
         const localData = localStorage.getItem("user_addresses");
         if (localData) {
           try {
@@ -241,9 +249,6 @@ export default function CheckoutPage() {
     }
   }, [userLoading, form.location]);
 
-  // =====================
-  // LOCATION UPDATE
-  // =====================
   const setLocation = (data: any) => {
     setForm(prev => {
       const updatedLoc = data;
@@ -256,9 +261,6 @@ export default function CheckoutPage() {
     setShowLocationModal(false);
   };
 
-  // =====================
-  // DELIVERY TYPE SWITCH
-  // =====================
   const handleDeliveryTypeChange = (type: "regular" | "express") => {
     setDeliveryType(type);
     if (type === "express" && matchedExpressZone) {
@@ -268,9 +270,6 @@ export default function CheckoutPage() {
     }
   };
 
-  // =====================
-  // CONTINUE PAYMENT
-  // =====================
   const continuePayment = () => {
     setError("");
 
@@ -317,15 +316,30 @@ export default function CheckoutPage() {
     );
   }
 
-  // Calculate Subtotal & Shipping Fee for Summary
-  const subtotal = items.reduce((acc: number, item: any) => {
-    const price = item?.product?.discountPrice || item?.product?.price || item?.price || 0;
-    return acc + price * item.quantity;
-  }, 0);
+  // =====================
+  // CALCULATED FEES LOGIC
+  // =====================
+  const getRawRegularFee = (zone: any) => {
+    if (!zone) return 60;
+    const freeDeliveryAbove = Number(zone.freeDeliveryAbove) || Number(zone.minOrderAmount) || 0;
+    if (freeDeliveryAbove > 0 && subtotal >= freeDeliveryAbove) {
+      return 0; 
+    }
+    return Number(zone.deliveryFee) ?? 60; 
+  };
 
+  const getRawExpressFee = (zone: any) => {
+    if (!zone) return 50;
+    return Number(zone.expressFee ?? zone.expressDeliveryFee ?? zone.charge ?? 50);
+  };
+
+  const regularFeeAmount = getRawRegularFee(matchedRegularZone);
+  const expressFeeAmount = getRawExpressFee(matchedExpressZone);
+
+  // টোটাল শিপিং ফি হিসাব
   const shippingFee = deliveryType === "express" 
-    ? (matchedExpressZone?.deliveryFee || 100) 
-    : (matchedRegularZone?.deliveryFee || 60);
+    ? regularFeeAmount + expressFeeAmount
+    : regularFeeAmount;
 
   const grandTotal = subtotal + shippingFee;
 
@@ -333,7 +347,6 @@ export default function CheckoutPage() {
     <main className="min-h-screen bg-zinc-50/50 pb-20 pt-8 text-zinc-900 selection:bg-black selection:text-white">
       <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
         
-        {/* Top Header & Progress */}
         <div className="mb-8">
           <CheckoutHeader />
           <div className="mt-4">
@@ -343,10 +356,8 @@ export default function CheckoutPage() {
 
         <div className="grid gap-8 lg:grid-cols-12 items-start">
           
-          {/* LEFT CONTENT AREA (8 Cols) */}
           <div className="space-y-6 lg:col-span-7 xl:col-span-8">
             
-            {/* DELIVERY TO DEFAULT / PIN ADDRESS & ADD NEW LOCATION */}
             <div className="rounded-2xl border border-zinc-200/80 bg-white p-6 shadow-sm/50 space-y-5">
               <div className="flex items-center justify-between border-b border-zinc-100 pb-4">
                 <div>
@@ -356,7 +367,6 @@ export default function CheckoutPage() {
                   <p className="text-xs text-zinc-500 mt-0.5">Your default address is loaded below. You can update it anytime.</p>
                 </div>
                 
-                {/* Add New Location Button */}
                 <button
                   type="button"
                   onClick={() => setShowLocationModal(true)}
@@ -367,7 +377,6 @@ export default function CheckoutPage() {
               </div>
 
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                {/* Contact Card */}
                 <div className="space-y-2 bg-zinc-50/70 p-4 rounded-xl border border-zinc-100">
                   <p className="text-[10px] font-bold text-zinc-400 uppercase tracking-wider">Recipient Contact</p>
                   <div className="space-y-1">
@@ -380,7 +389,6 @@ export default function CheckoutPage() {
                   </div>
                 </div>
 
-                {/* Location Card */}
                 <div className="space-y-2 bg-zinc-50/70 p-4 rounded-xl border border-zinc-100">
                   <p className="text-[10px] font-bold text-zinc-400 uppercase tracking-wider">Default Delivery Address</p>
                   <div className="space-y-1">
@@ -396,7 +404,6 @@ export default function CheckoutPage() {
               </div>
             </div>
 
-            {/* MAP LOCATION PICKER MODAL POPUP */}
             {showLocationModal && (
               <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 p-4 backdrop-blur-md animate-fadeIn">
                 <div className="relative w-full max-w-2xl rounded-2xl bg-white p-6 shadow-2xl space-y-4 max-h-[90vh] overflow-y-auto">
@@ -413,7 +420,6 @@ export default function CheckoutPage() {
                     </button>
                   </div>
 
-                  {/* Location Picker Component */}
                   <LocationPicker
                     location={form.location}
                     setLocation={setLocation}
@@ -422,7 +428,6 @@ export default function CheckoutPage() {
               </div>
             )}
 
-            {/* CHOOSE DELIVERY METHOD */}
             <div className="rounded-2xl border border-zinc-200/80 bg-white p-6 shadow-sm/50 space-y-4">
               <div>
                 <h2 className="text-sm font-bold tracking-tight flex items-center gap-2 text-zinc-900 uppercase">
@@ -433,7 +438,6 @@ export default function CheckoutPage() {
 
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                 
-                {/* Regular Delivery Box */}
                 <div
                   onClick={() => handleDeliveryTypeChange("regular")}
                   className={`p-4 rounded-xl border cursor-pointer transition-all flex flex-col justify-between gap-3 ${
@@ -455,12 +459,18 @@ export default function CheckoutPage() {
                       <Clock size={13} className="text-zinc-400" /> Estimated: <strong className="text-zinc-900">{matchedRegularZone?.estimatedDays || "3-5 Days"}</strong>
                     </p>
                     <p className="flex items-center gap-1.5">
-                      <MapPin size={13} className="text-zinc-400" /> Charge: <strong className="text-zinc-900">{formatPrice(matchedRegularZone?.deliveryFee || 60)}</strong>
+                      <MapPin size={13} className="text-zinc-400" /> Delivery Fee:{" "}
+                      <strong className="text-zinc-900">
+                        {regularFeeAmount === 0 ? (
+                          <span className="text-emerald-600 font-bold">FREE</span>
+                        ) : (
+                          formatPrice(regularFeeAmount)
+                        )}
+                      </strong>
                     </p>
                   </div>
                 </div>
 
-                {/* Express Delivery Box */}
                 <div
                   onClick={() => expressAvailable && handleDeliveryTypeChange("express")}
                   className={`p-4 rounded-xl border transition-all flex flex-col justify-between gap-3 ${
@@ -492,7 +502,20 @@ export default function CheckoutPage() {
                           <Clock size={13} className="text-amber-500" /> Estimated: <strong className="text-zinc-900">{matchedExpressZone?.estimatedDays || "Within 3 Hours"}</strong>
                         </p>
                         <p className="flex items-center gap-1.5">
-                          <MapPin size={13} className="text-amber-500" /> Charge: <strong className="text-zinc-900">{formatPrice(matchedExpressZone?.deliveryFee || 100)}</strong>
+                          <MapPin size={13} className="text-amber-500" /> Delivery Fee:{" "}
+                          <strong className="text-zinc-900">
+                            {regularFeeAmount === 0 ? (
+                              <span className="text-emerald-600 font-bold">FREE</span>
+                            ) : (
+                              formatPrice(regularFeeAmount)
+                            )}
+                          </strong>
+                        </p>
+                        <p className="flex items-center gap-1.5">
+                          <Zap size={13} className="text-amber-500" /> Express Fee:{" "}
+                          <strong className="text-zinc-900">
+                            {formatPrice(expressFeeAmount)}
+                          </strong>
                         </p>
                       </>
                     ) : (
@@ -506,7 +529,6 @@ export default function CheckoutPage() {
               </div>
             </div>
 
-            {/* ERROR ALERT */}
             {error && (
               <div className="rounded-xl border border-red-200 bg-red-50 p-4 text-xs font-semibold text-red-600 flex items-center gap-2">
                 <XCircle size={16} className="shrink-0" />
@@ -515,7 +537,6 @@ export default function CheckoutPage() {
             )}
           </div>
 
-          {/* RIGHT ORDER SUMMARY STICKY SIDEBAR (5 Cols) */}
           <div className="lg:sticky lg:top-8 lg:col-span-5 xl:col-span-4 space-y-4">
             <div className="rounded-2xl border border-zinc-200/80 bg-white p-6 shadow-sm/50 space-y-5">
               <h2 className="text-sm font-bold text-zinc-900 uppercase tracking-tight border-b border-zinc-100 pb-3 flex items-center justify-between">
@@ -523,7 +544,6 @@ export default function CheckoutPage() {
                 <span className="text-xs font-medium text-zinc-500">{items.length} {items.length === 1 ? 'Item' : 'Items'}</span>
               </h2>
 
-              {/* Items List */}
               <div className="space-y-4 max-h-[280px] overflow-y-auto pr-1">
                 {items.map((item: any) => (
                   <div
@@ -558,23 +578,40 @@ export default function CheckoutPage() {
                 ))}
               </div>
 
-              {/* Cost Breakdown */}
               <div className="space-y-2 pt-3 border-t border-zinc-100 text-xs text-zinc-600">
                 <div className="flex justify-between">
                   <span>Subtotal</span>
                   <span className="font-semibold text-zinc-900">{formatPrice(subtotal)}</span>
                 </div>
-                <div className="flex justify-between">
-                  <span>Shipping Fee ({deliveryType})</span>
-                  <span className="font-semibold text-zinc-900">{formatPrice(shippingFee)}</span>
+
+                {/* Regular Delivery Fee */}
+                <div className="flex justify-between items-center">
+                  <span>Estimated Delivery Fee</span>
+                  <span className="font-semibold text-zinc-900">
+                    {regularFeeAmount === 0 ? (
+                      <span className="text-emerald-600 font-bold">FREE</span>
+                    ) : (
+                      formatPrice(regularFeeAmount)
+                    )}
+                  </span>
                 </div>
+
+                {/* Express Fee (Only if Express selected) */}
+                {deliveryType === "express" && (
+                  <div className="flex justify-between items-center text-amber-700">
+                    <span>Express Fee</span>
+                    <span className="font-semibold">
+                      {formatPrice(expressFeeAmount)}
+                    </span>
+                  </div>
+                )}
+
                 <div className="flex justify-between text-sm font-bold text-zinc-900 pt-3 border-t border-dashed border-zinc-200">
                   <span>Total Amount</span>
                   <span className="text-base">{formatPrice(grandTotal)}</span>
                 </div>
               </div>
 
-              {/* Secure Continue Button */}
               <button
                 type="button"
                 onClick={continuePayment}
@@ -584,7 +621,6 @@ export default function CheckoutPage() {
                 <ArrowRight size={15} />
               </button>
 
-              {/* Trust & Security Badge */}
               <div className="pt-2 flex items-center justify-center gap-1.5 text-[11px] text-zinc-400 font-medium text-center">
                 <Lock size={13} className="text-emerald-600" />
                 <span>Encrypted & Safe Checkout Experience</span>

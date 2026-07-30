@@ -47,19 +47,20 @@ export interface IOrder extends Document {
   deliveryZone?: mongoose.Types.ObjectId;
   deliveryZoneName: string;
   deliveryFee: number;
+  expressFee: number; // ৩ আওয়ার এক্সপ্রেস ডেলিভারির ফিক্সড চার্জ
   paymentMethod: "COD" | "SSLCOMMERZ" | "BKASH" | "NAGAD" | "CARD";
   paymentInfo?: {
     transactionId?: string;
     paidAt?: Date;
-    gatewayResponse?: any; // SSLCOMMERZ বা পেমেন্ট গেটওয়ের সম্পূর্ণ রেসপন্স রাখার জন্য
+    gatewayResponse?: any;
   };
   paymentStatus: "pending" | "paid" | "failed";
   orderStatus: "pending" | "processing" | "shipped" | "delivered" | "cancelled";
   subtotal: number;
-  tax: number; // ফ্রন্টএন্ডে ৫% ট্যাক্স হিসাব করা হচ্ছিল, যা এখানে ডাটাবেজে ট্র্যাক রাখা উচিত
+  tax: number;
   discountAmount: number;
   totalPrice: number;
-  couponCode?: string; // কুপন কোড সবসময় নাও থাকতে পারে, তাই অপশনাল
+  couponCode?: string;
 }
 
 const OrderSchema = new Schema<IOrder>(
@@ -154,6 +155,10 @@ const OrderSchema = new Schema<IOrder>(
       type: Number,
       default: 0,
     },
+    expressFee: {
+      type: Number,
+      default: 0, // ফিক্সড এক্সপ্রেস চার্জ সংরক্ষণের জন্য
+    },
 
     // ===============================
     // PAYMENT
@@ -173,7 +178,7 @@ const OrderSchema = new Schema<IOrder>(
         type: Date,
       },
       gatewayResponse: {
-        type: Schema.Types.Mixed, // গেটওয়ের যেকোনো অবজেক্ট বা মেটাডাটা স্টোর করার জন্য
+        type: Schema.Types.Mixed,
       },
     },
     paymentStatus: {
@@ -200,7 +205,7 @@ const OrderSchema = new Schema<IOrder>(
     },
     tax: {
       type: Number,
-      default: 0, // ৫% ট্যাক্স ট্র্যাক করার জন্য ফিল্ড যোগ করা হলো
+      default: 0,
     },
     discountAmount: {
       type: Number,
@@ -221,7 +226,7 @@ const OrderSchema = new Schema<IOrder>(
   }
 );
 
-// ইডেক্সিং (Indexing) - দ্রুত সার্চ করার জন্য
+// ইডেক্সিং (Indexing)
 OrderSchema.index({ user: 1, createdAt: -1 });
 OrderSchema.index({ "paymentInfo.transactionId": 1 });
 

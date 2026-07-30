@@ -90,9 +90,9 @@ export default function DeliveryZonesPage() {
     newExpressAreaName: "",
 
     expressSubArea: "",                   
-    deliveryFee: 0,
-    minOrderAmount: 0, 
-    isFreeShipping: false, // <-- ফ্রি শিপিং অপশন (Free Toggle)
+    deliveryFee: 60,
+    expressFee: 100, // ডিফল্ট এক্সপ্রেস ফি আপডেট করা হলো 
+    freeDeliveryAbove: 0, 
     estimatedDays: "2-3 Days",
     active: true,
   });
@@ -249,10 +249,7 @@ export default function DeliveryZonesPage() {
         }
 
         const finalExpArea = form.isNewExpressArea ? form.newExpressAreaName.trim() : form.expressArea;
-        if (!finalExpArea || !form.expressSubArea.trim()) {
-          toast.error("Both Express Area and Sub-Area fields are required");
-          return;
-        }
+        const subAreaVal = form.expressSubArea.trim() || finalExpArea;
 
         if (form.isNewExpressArea && form.newExpressAreaName.trim()) {
           if (!expressAreasList.includes(form.newExpressAreaName.trim())) {
@@ -260,14 +257,18 @@ export default function DeliveryZonesPage() {
           }
         }
 
-        finalZoneName = `[${finalDistrict}] ${finalThana} - ${finalExpArea} (${form.expressSubArea.trim()}) [3 Hours]`;
+        // চেকআউট পেজের ম্যাপিংয়ের সাথে মিল রাখার জন্য ঠিকমতো [3 Hours] ফরম্যাট করা হলো
+        finalZoneName = `[${finalDistrict}] ${finalThana} - ${finalExpArea} (${subAreaVal}) [3 Hours]`;
       }
+
+      const calculatedExpressFee = form.zoneCategory === "3 Hours" ? Number(form.expressFee) || 0 : 0;
 
       const payload = {
         name: finalZoneName,
-        deliveryFee: form.isFreeShipping ? 0 : form.deliveryFee,
-        minOrderAmount: form.minOrderAmount,
-        isFreeShipping: form.isFreeShipping, // ফ্রি শিপিং অপশন ব্যাকএন্ডে পাঠানো
+        deliveryFee: Number(form.deliveryFee) || 0,
+        expressFee: calculatedExpressFee,
+        expressDeliveryFee: calculatedExpressFee, 
+        freeDeliveryAbove: Number(form.freeDeliveryAbove) || 0,
         estimatedDays: form.zoneCategory === "3 Hours" ? "Within 3 Hours" : form.estimatedDays,
         active: form.active,
       };
@@ -289,7 +290,7 @@ export default function DeliveryZonesPage() {
         regularZoneSelect: "Inside Dhaka",
         isNewRegularZone: false,
         newRegularZoneName: "",
-        district: finalDistrict,
+        district: "Dhaka",
         isNewDistrict: false,
         newDistrictName: "",
         regularThana: "",
@@ -302,16 +303,17 @@ export default function DeliveryZonesPage() {
         isNewExpressArea: false,
         newExpressAreaName: "",
         expressSubArea: "",
-        deliveryFee: 0,
-        minOrderAmount: 0,
-        isFreeShipping: false,
+        deliveryFee: 60,
+        expressFee: 100,
+        freeDeliveryAbove: 0,
         estimatedDays: "2-3 Days",
         active: true,
       });
 
       loadZones();
     } catch (error: any) {
-      toast.error(error.message || "Something went wrong");
+      console.error("Submit Error:", error);
+      toast.error(error.response?.data?.message || error.message || "Something went wrong");
     } finally {
       setSubmitting(false);
     }
@@ -320,6 +322,7 @@ export default function DeliveryZonesPage() {
   const handleEdit = (zone: any) => {
     setEditingId(zone._id);
     const isExpress = zone.name.includes("3 Hours") || zone.name.includes("[3 Hours]");
+    const resolvedExpressFee = zone.expressFee ?? zone.expressDeliveryFee ?? zone.charge ?? 100;
 
     setForm({
       zoneCategory: isExpress ? "3 Hours" : "Regular",
@@ -339,9 +342,9 @@ export default function DeliveryZonesPage() {
       isNewExpressArea: false,
       newExpressAreaName: "",
       expressSubArea: "",
-      deliveryFee: zone.deliveryFee || 0,
-      minOrderAmount: zone.minOrderAmount || 0,
-      isFreeShipping: zone.isFreeShipping || false,
+      deliveryFee: zone.deliveryFee || 60,
+      expressFee: resolvedExpressFee,
+      freeDeliveryAbove: zone.freeDeliveryAbove || zone.minOrderAmount || 0,
       estimatedDays: zone.estimatedDays || "2-3 Days",
       active: zone.active,
     });
@@ -368,9 +371,9 @@ export default function DeliveryZonesPage() {
       isNewExpressArea: false,
       newExpressAreaName: "",
       expressSubArea: "",
-      deliveryFee: 0,
-      minOrderAmount: 0,
-      isFreeShipping: false,
+      deliveryFee: 60,
+      expressFee: 100,
+      freeDeliveryAbove: 0,
       estimatedDays: "2-3 Days",
       active: true,
     });
@@ -405,7 +408,7 @@ export default function DeliveryZonesPage() {
             Delivery Zones
           </h1>
           <p className="mt-1 text-gray-500 text-sm">
-            Manage regular and 3 hours express delivery zones, fees and minimum orders
+            Manage regular and 3 hours express delivery zones, fees and minimum order conditions for free delivery
           </p>
         </div>
 
@@ -714,27 +717,41 @@ export default function DeliveryZonesPage() {
           )}
 
           <div>
-            <label className="block text-xs font-bold uppercase tracking-wider text-gray-500 mb-2">Delivery Fee (৳)</label>
+            <label className="block text-xs font-bold uppercase tracking-wider text-gray-500 mb-2">Regular Delivery Fee (৳)</label>
             <input
               type="number"
-              disabled={form.isFreeShipping}
               value={form.deliveryFee}
               onChange={(e) => setForm({ ...form, deliveryFee: Number(e.target.value) })}
               placeholder="60"
-              className="w-full rounded-2xl border bg-gray-50/50 p-3.5 text-sm outline-none focus:bg-white focus:border-black transition disabled:opacity-50"
+              className="w-full rounded-2xl border bg-gray-50/50 p-3.5 text-sm outline-none focus:bg-white focus:border-black transition"
             />
           </div>
 
-          {/* Minimum Order Amount Field */}
+          {/* Express Charge Field */}
+          {form.zoneCategory === "3 Hours" && (
+            <div>
+              <label className="block text-xs font-bold uppercase tracking-wider text-gray-500 mb-2">Fixed Express Charge (৳)</label>
+              <input
+                type="number"
+                value={form.expressFee}
+                onChange={(e) => setForm({ ...form, expressFee: Number(e.target.value) })}
+                placeholder="100"
+                className="w-full rounded-2xl border bg-gray-50/50 p-3.5 text-sm outline-none focus:bg-white focus:border-black transition"
+              />
+            </div>
+          )}
+
+          {/* Free Delivery Above Field */}
           <div>
-            <label className="block text-xs font-bold uppercase tracking-wider text-gray-500 mb-2">Min Order Amount for Free Shipping (৳)</label>
+            <label className="block text-xs font-bold uppercase tracking-wider text-gray-500 mb-2">Free Delivery Min Order (৳)</label>
             <input
               type="number"
-              value={form.minOrderAmount}
-              onChange={(e) => setForm({ ...form, minOrderAmount: Number(e.target.value) })}
-              placeholder="0"
+              value={form.freeDeliveryAbove}
+              onChange={(e) => setForm({ ...form, freeDeliveryAbove: Number(e.target.value) })}
+              placeholder="0 (0 = disabled)"
               className="w-full rounded-2xl border bg-gray-50/50 p-3.5 text-sm outline-none focus:bg-white focus:border-black transition"
             />
+            <span className="text-[11px] text-gray-400 mt-1 block">If order amount $\ge$ this, delivery will be FREE.</span>
           </div>
 
           <div>
@@ -749,33 +766,18 @@ export default function DeliveryZonesPage() {
           </div>
         </div>
 
-        {/* Free Shipping Checkbox & Status */}
-        <div className="mt-6 flex flex-col sm:flex-row sm:items-center gap-6">
-          <div className="flex items-center gap-3">
-            <input
-              type="checkbox"
-              id="freeShippingStatus"
-              checked={form.isFreeShipping}
-              onChange={(e) => setForm({ ...form, isFreeShipping: e.target.checked, deliveryFee: e.target.checked ? 0 : form.deliveryFee })}
-              className="w-5 h-5 accent-black rounded cursor-pointer"
-            />
-            <label htmlFor="freeShippingStatus" className="text-sm font-semibold cursor-pointer select-none">
-              Always Free Shipping (Free for all orders in this zone)
-            </label>
-          </div>
-
-          <div className="flex items-center gap-3">
-            <input
-              type="checkbox"
-              id="activeStatus"
-              checked={form.active}
-              onChange={(e) => setForm({ ...form, active: e.target.checked })}
-              className="w-5 h-5 accent-black rounded cursor-pointer"
-            />
-            <label htmlFor="activeStatus" className="text-sm font-semibold cursor-pointer select-none">
-              Active Zone (Available for checkout)
-            </label>
-          </div>
+        {/* Active Status Checkbox */}
+        <div className="mt-6 flex items-center gap-3">
+          <input
+            type="checkbox"
+            id="activeStatus"
+            checked={form.active}
+            onChange={(e) => setForm({ ...form, active: e.target.checked })}
+            className="w-5 h-5 accent-black rounded cursor-pointer"
+          />
+          <label htmlFor="activeStatus" className="text-sm font-semibold cursor-pointer select-none">
+            Active Zone (Available for checkout)
+          </label>
         </div>
 
         <div className="flex items-center gap-3 mt-6">
@@ -813,7 +815,8 @@ export default function DeliveryZonesPage() {
               <tr className="border-b bg-gray-50/70 text-gray-500 text-xs uppercase tracking-wider">
                 <th className="p-4 sm:p-5">Zone Name</th>
                 <th className="p-4 sm:p-5">Delivery Fee</th>
-                <th className="p-4 sm:p-5">Free Shipping Min Order</th>
+                <th className="p-4 sm:p-5">Express Fee</th>
+                <th className="p-4 sm:p-5">Free Delivery Threshold</th>
                 <th className="p-4 sm:p-5">ETA</th>
                 <th className="p-4 sm:p-5">Status</th>
                 <th className="p-4 sm:p-5 text-right">Actions</th>
@@ -822,7 +825,7 @@ export default function DeliveryZonesPage() {
             <tbody className="divide-y divide-gray-100 text-sm">
               {loading ? (
                 <tr>
-                  <td colSpan={6} className="p-12 text-center text-gray-500">
+                  <td colSpan={7} className="p-12 text-center text-gray-500">
                     <div className="flex flex-col items-center justify-center gap-2">
                       <Loader2 size={24} className="animate-spin text-black" />
                       <span>Loading delivery zones...</span>
@@ -831,13 +834,16 @@ export default function DeliveryZonesPage() {
                 </tr>
               ) : filteredZones.length === 0 ? (
                 <tr>
-                  <td colSpan={6} className="p-12 text-center text-gray-500">
+                  <td colSpan={7} className="p-12 text-center text-gray-500">
                     No delivery zones found
                   </td>
                 </tr>
               ) : (
                 filteredZones.map((zone) => {
                   const isExpress = zone.name.includes("3 Hours") || zone.name.includes("[3 Hours]");
+                  const freeThreshold = zone.freeDeliveryAbove || zone.minOrderAmount || 0;
+                  const displayExpressFee = zone.expressFee ?? zone.expressDeliveryFee ?? zone.charge ?? 100;
+
                   return (
                     <tr key={zone._id} className="hover:bg-gray-50/60 transition">
                       <td className="p-4 sm:p-5 font-bold">
@@ -852,15 +858,20 @@ export default function DeliveryZonesPage() {
                           </span>
                         )}
                       </td>
+                      <td className="p-4 sm:p-5 font-medium">৳{zone.deliveryFee}</td>
                       <td className="p-4 sm:p-5 font-medium">
-                        {zone.isFreeShipping || zone.deliveryFee === 0 ? (
-                          <span className="text-emerald-600 font-bold">FREE</span>
+                        {isExpress ? (
+                          <span className="text-purple-600 font-bold">৳{displayExpressFee}</span>
                         ) : (
-                          `৳${zone.deliveryFee}`
+                          <span className="text-gray-400">N/A</span>
                         )}
                       </td>
                       <td className="p-4 sm:p-5 font-medium">
-                        {zone.minOrderAmount > 0 ? `৳${zone.minOrderAmount}` : "None"}
+                        {freeThreshold > 0 ? (
+                          <span className="text-emerald-600 font-bold">Free if order $\ge$ ৳{freeThreshold}</span>
+                        ) : (
+                          <span className="text-gray-400">Not Set</span>
+                        )}
                       </td>
                       <td className="p-4 sm:p-5 text-gray-600">{zone.estimatedDays}</td>
                       <td className="p-4 sm:p-5">
