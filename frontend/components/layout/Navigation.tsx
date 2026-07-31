@@ -5,11 +5,10 @@ import { usePathname } from "next/navigation";
 
 import {
   Home,
-  ShoppingBag,
   Grid2X2,
   Flame,
-  Sparkles,
   Tag,
+  Sparkles,
   Phone,
 } from "lucide-react";
 
@@ -28,14 +27,16 @@ const navItems: NavItem[] = [
     icon: "home",
   },
   {
-    name: "Shop",
-    href: "/shop",
-    icon: "shop",
-  },
-  {
     name: "Category",
     href: "/category",
     icon: "category",
+  },
+  {
+    name: "Deals",
+    href: "/deals",
+    icon: "tag",
+    badge: "Hot",
+    badgeColor: "bg-rose-500 text-white",
   },
   {
     name: "Best Sellers",
@@ -48,13 +49,6 @@ const navItems: NavItem[] = [
     icon: "sparkles",
     badge: "New",
     badgeColor: "bg-emerald-500 text-white",
-  },
-  {
-    name: "Deals",
-    href: "/deals",
-    icon: "tag",
-    badge: "Hot",
-    badgeColor: "bg-rose-500 text-white",
   },
   {
     name: "Contact",
@@ -78,16 +72,14 @@ export default function Navigation() {
     switch (icon) {
       case "home":
         return <Home size={22} className={active ? "text-white" : "text-blue-500"} />;
-      case "shop":
-        return <ShoppingBag size={22} className={active ? "text-white" : "text-indigo-500"} />;
       case "category":
         return <Grid2X2 size={22} className={active ? "text-white" : "text-emerald-500"} />;
+      case "tag":
+        return <Tag size={22} className={active ? "text-white" : "text-rose-500"} />;
       case "flame":
         return <Flame size={22} className={active ? "text-white" : "text-amber-500"} />;
       case "sparkles":
         return <Sparkles size={22} className={active ? "text-white" : "text-purple-500"} />;
-      case "tag":
-        return <Tag size={22} className={active ? "text-white" : "text-rose-500"} />;
       case "phone":
         return <Phone size={22} className={active ? "text-white" : "text-sky-500"} />;
       default:
