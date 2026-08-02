@@ -3,6 +3,7 @@
 import {
   useEffect,
   useState,
+  useRef,
 } from "react";
 import {
   useRouter,
@@ -18,9 +19,7 @@ import {
   Globe,
   Plus,
   Trash,
-  Calendar,
   Bell,
-  Cpu,
   Shirt,
   Watch,
   Footprints,
@@ -28,9 +27,10 @@ import {
   Smartphone,
   Tablet,
   Laptop as LaptopIcon,
-  Glasses,
-  Crown,
   ArrowLeft,
+  ChevronDown,
+  Check,
+  FolderTree,
 } from "lucide-react";
 import {
   toast,
@@ -46,11 +46,11 @@ import {
 } from "@/types/category";
 import { useCurrency } from "@/context/CurrencyContext";
 
-const AVAILABLE_SIZES = ["XS", "S", "M", "L", "XL", "XXL", "Free Size"];
-const AVAILABLE_SHOE_SIZES = ["6", "7", "8", "9", "10", "11", "12", "UK 6", "UK 7", "UK 8", "UK 9", "UK 10"];
-const AVAILABLE_PANT_SIZES = ["28", "30", "32", "34", "36", "38", "40", "42"];
-const AVAILABLE_UNDERWEAR_SIZES = ["S", "M", "L", "XL", "XXL"];
-const AVAILABLE_COLORS = [
+const DEFAULT_SIZES = ["XS", "S", "M", "L", "XL", "XXL", "Free Size"];
+const DEFAULT_SHOE_SIZES = ["6", "7", "8", "9", "10", "11", "12", "UK 6", "UK 7", "UK 8", "UK 9", "UK 10"];
+const DEFAULT_PANT_SIZES = ["28", "30", "32", "34", "36", "38", "40", "42"];
+const DEFAULT_UNDERWEAR_SIZES = ["S", "M", "L", "XL", "XXL"];
+const DEFAULT_COLORS = [
   { name: "Black", hex: "#000000" },
   { name: "White", hex: "#FFFFFF" },
   { name: "Red", hex: "#EF4444" },
@@ -69,6 +69,11 @@ export default function AddProductPage() {
   const [categoryLoading, setCategoryLoading] = useState(true);
   const [images, setImages] = useState<File[]>([]);
   const [previews, setPreviews] = useState<string[]>([]);
+
+  // Custom Dropdown Interactive States
+  const [isCategoryOpen, setIsCategoryOpen] = useState(false);
+  const [expandedParents, setExpandedParents] = useState<Record<string, boolean>>({});
+  const categoryDropdownRef = useRef<HTMLDivElement>(null);
 
   // Main Form State
   const [form, setForm] = useState({
@@ -90,27 +95,38 @@ export default function AddProductPage() {
     metaTitle: "",
     metaDescription: "",
     
-    // Individual Category Specific Fields
+    // Category Specific Fields
     warrantyPeriod: "",
-    storageCapacity: "", // Mobile, iPad, Laptop
-    ramSize: "", // Mobile, Laptop
-    screenSize: "", // Mobile, iPad, Laptop
-    processorType: "", // Laptop, iPad, Mobile
-    fabricType: "", // Shirt, T-Shirt, Pants, Underwear
-    fitType: "", // Shirt, T-Shirt, Pants
-    waistRise: "", // Pants
-    material: "", // Accessories, Cap, Watch
-    strapType: "", // Watch
-    soleMaterial: "", // Shoes
-    capStyle: "", // Cap
+    storageCapacity: "",
+    ramSize: "",
+    screenSize: "",
+    processorType: "",
+    fabricType: "",
+    fitType: "",
+    waistRise: "",
+    material: "",
+    strapType: "",
+    soleMaterial: "",
+    capStyle: "",
 
     isFeatured: false,
     isBestSeller: false,
     isNewArrival: true,
   });
 
+  // Custom Editable Lists for Sizes and Colors
+  const [availableSizesList, setAvailableSizesList] = useState<string[]>(DEFAULT_SIZES);
+  const [availableColorsList, setAvailableColorsList] = useState<{ name: string; hex: string }[]>(DEFAULT_COLORS);
+
+  const [newSizeInput, setNewSizeInput] = useState("");
+  const [newColorNameInput, setNewColorNameInput] = useState("");
+  const [newColorHexInput, setNewColorHexInput] = useState("#000000");
+
+  // Selected State
   const [selectedSizes, setSelectedSizes] = useState<string[]>([]);
   const [selectedColors, setSelectedColors] = useState<string[]>([]);
+  const [sizeColorStock, setSizeColorStock] = useState<Record<string, Record<string, number>>>({});
+
   const [specifications, setSpecifications] = useState<{ key: string; value: string }[]>([
     { key: "", value: "" },
   ]);
@@ -118,7 +134,6 @@ export default function AddProductPage() {
   const selectedCategoryObj = categories.find((cat) => cat._id === form.category);
   const categoryName = selectedCategoryObj?.name?.toLowerCase() || "";
 
-  // Distinct Individual Category Identifiers
   const isMobile = categoryName.includes("mobile") || categoryName.includes("phone") || categoryName.includes("smartphone");
   const isIpad = categoryName.includes("ipad") || categoryName.includes("tablet");
   const isLaptop = categoryName.includes("laptop") || categoryName.includes("macbook") || categoryName.includes("computer");
@@ -131,16 +146,186 @@ export default function AddProductPage() {
   const isShoes = categoryName.includes("shoe") || categoryName.includes("footwear") || categoryName.includes("sneaker") || categoryName.includes("sandal") || categoryName.includes("boot");
   const isAccessories = (categoryName.includes("accessori") || categoryName.includes("jewel") || categoryName.includes("sunglass")) && !isWatch && !isCap;
 
+  const hasSizes = !isMobile && !isIpad && !isLaptop && !isWatch && !isAccessories;
+
+  // Outside click listener for custom category dropdown
+  useEffect(() => {
+    const handleClickOutside = (event: MouseEvent) => {
+      if (categoryDropdownRef.current && !categoryDropdownRef.current.contains(event.target as Node)) {
+        setIsCategoryOpen(false);
+      }
+    };
+    document.addEventListener("mousedown", handleClickOutside);
+    return () => document.removeEventListener("mousedown", handleClickOutside);
+  }, []);
+
+  // Category change korle selected size, color & stock matrix reset korar jonno
+  useEffect(() => {
+    setSelectedSizes([]);
+    setSelectedColors([]);
+    setSizeColorStock({});
+    setForm((prev) => ({ ...prev, stock: "" }));
+  }, [form.category]);
+
+  // Auto adjust default sizes list based on category type
+  useEffect(() => {
+    if (isPant) {
+      setAvailableSizesList(DEFAULT_PANT_SIZES);
+    } else if (isShoes) {
+      setAvailableSizesList(DEFAULT_SHOE_SIZES);
+    } else if (isUnderwear) {
+      setAvailableSizesList(DEFAULT_UNDERWEAR_SIZES);
+    } else {
+      setAvailableSizesList(DEFAULT_SIZES);
+    }
+  }, [isPant, isShoes, isUnderwear]);
+
+  // Add Custom Size
+  const handleAddCustomSize = () => {
+    if (!newSizeInput.trim()) return;
+    const formattedSize = newSizeInput.trim().toUpperCase();
+    if (!availableSizesList.includes(formattedSize)) {
+      setAvailableSizesList((prev) => [...prev, formattedSize]);
+    }
+    setSelectedSizes((prev) => (prev.includes(formattedSize) ? prev : [...prev, formattedSize]));
+    setNewSizeInput("");
+  };
+
+  // Delete Size from list
+  const handleDeleteSize = (sizeToDelete: string) => {
+    setAvailableSizesList((prev) => prev.filter((s) => s !== sizeToDelete));
+    setSelectedSizes((prev) => prev.filter((s) => s !== sizeToDelete));
+    setSizeColorStock((prev) => {
+      const updated = { ...prev };
+      delete updated[sizeToDelete];
+      
+      let total = 0;
+      Object.keys(updated).forEach((sz) => {
+        Object.keys(updated[sz]).forEach((col) => {
+          total += updated[sz][col] || 0;
+        });
+      });
+      setForm((f) => ({ ...f, stock: total === 0 ? "" : total.toString() }));
+
+      return updated;
+    });
+  };
+
+  // Add Custom Color
+  const handleAddCustomColor = () => {
+    if (!newColorNameInput.trim()) return;
+    const colorName = newColorNameInput.trim();
+    const exists = availableColorsList.some((c) => c.name.toLowerCase() === colorName.toLowerCase());
+    
+    if (!exists) {
+      setAvailableColorsList((prev) => [...prev, { name: colorName, hex: newColorHexInput }]);
+    }
+    setSelectedColors((prev) => (prev.includes(colorName) ? prev : [...prev, colorName]));
+    setNewColorNameInput("");
+  };
+
+  // Delete Color from list
+  const handleDeleteColor = (colorToDelete: string) => {
+    setAvailableColorsList((prev) => prev.filter((c) => c.name !== colorToDelete));
+    setSelectedColors((prev) => prev.filter((c) => c !== colorToDelete));
+    setSizeColorStock((prev) => {
+      const updated = { ...prev };
+      Object.keys(updated).forEach((sz) => {
+        if (updated[sz]) {
+          const colorMap = { ...updated[sz] };
+          delete colorMap[colorToDelete];
+          updated[sz] = colorMap;
+        }
+      });
+
+      let total = 0;
+      Object.keys(updated).forEach((sz) => {
+        Object.keys(updated[sz]).forEach((col) => {
+          total += updated[sz][col] || 0;
+        });
+      });
+      setForm((f) => ({ ...f, stock: total === 0 ? "" : total.toString() }));
+
+      return updated;
+    });
+  };
+
   const toggleSize = (size: string) => {
-    setSelectedSizes((prev) =>
-      prev.includes(size) ? prev.filter((s) => s !== size) : [...prev, size]
-    );
+    setSelectedSizes((prev) => {
+      const nextSizes = prev.includes(size) ? prev.filter((s) => s !== size) : [...prev, size];
+      
+      setSizeColorStock((currentMatrix) => {
+        const updated = { ...currentMatrix };
+        if (prev.includes(size)) {
+          delete updated[size];
+        } else {
+          updated[size] = {};
+        }
+
+        let total = 0;
+        Object.keys(updated).forEach((sz) => {
+          Object.keys(updated[sz]).forEach((col) => {
+            total += updated[sz][col] || 0;
+          });
+        });
+        setForm((f) => ({ ...f, stock: total === 0 ? "" : total.toString() }));
+
+        return updated;
+      });
+
+      return nextSizes;
+    });
   };
 
   const toggleColor = (colorName: string) => {
-    setSelectedColors((prev) =>
-      prev.includes(colorName) ? prev.filter((c) => c !== colorName) : [...prev, colorName]
-    );
+    setSelectedColors((prev) => {
+      const nextColors = prev.includes(colorName) ? prev.filter((c) => c !== colorName) : [...prev, colorName];
+      
+      setSizeColorStock((currentMatrix) => {
+        const updated = { ...currentMatrix };
+        Object.keys(updated).forEach((sz) => {
+          if (updated[sz]) {
+            const colorMap = { ...updated[sz] };
+            if (prev.includes(colorName)) {
+              delete colorMap[colorName];
+            }
+            updated[sz] = colorMap;
+          }
+        });
+
+        let total = 0;
+        Object.keys(updated).forEach((sz) => {
+          Object.keys(updated[sz]).forEach((col) => {
+            total += updated[sz][col] || 0;
+          });
+        });
+        setForm((f) => ({ ...f, stock: total === 0 ? "" : total.toString() }));
+
+        return updated;
+      });
+
+      return nextColors;
+    });
+  };
+
+  const handleStockChange = (size: string, color: string, value: string) => {
+    const numVal = value === "" ? 0 : parseInt(value, 10);
+    setSizeColorStock((prev) => {
+      const sizeObj = prev[size] || {};
+      const updatedSizeObj = { ...sizeObj, [color]: isNaN(numVal) ? 0 : numVal };
+      const newMatrix = { ...prev, [size]: updatedSizeObj };
+
+      let total = 0;
+      Object.keys(newMatrix).forEach((sz) => {
+        Object.keys(newMatrix[sz]).forEach((col) => {
+          total += newMatrix[sz][col] || 0;
+        });
+      });
+
+      setForm((f) => ({ ...f, stock: total === 0 ? "" : total.toString() }));
+
+      return newMatrix;
+    });
   };
 
   const handleSpecChange = (index: number, field: "key" | "value", val: string) => {
@@ -242,6 +427,11 @@ export default function AddProductPage() {
         return;
       }
 
+      if (!form.category) {
+        setError("Please select a product category");
+        return;
+      }
+
       if (
         form.discountPrice &&
         Number(form.discountPrice) >= Number(form.price)
@@ -271,6 +461,7 @@ export default function AddProductPage() {
 
       data.append("sizes", JSON.stringify(selectedSizes));
       data.append("colors", JSON.stringify(selectedColors));
+      data.append("sizeColorStock", JSON.stringify(sizeColorStock));
       data.append("specifications", JSON.stringify(specifications.filter(s => s.key && s.value)));
 
       images.forEach((file) => {
@@ -289,9 +480,18 @@ export default function AddProductPage() {
     }
   };
 
+  const parentCategories = categories.filter((cat) => !cat.parent);
+  const getSubCategories = (parentId: string) => categories.filter((cat) => cat.parent === parentId || (cat.parent && typeof cat.parent === 'object' && (cat.parent as any)._id === parentId));
+
+  const toggleParentExpand = (parentId: string) => {
+    setExpandedParents((prev) => ({
+      ...prev,
+      [parentId]: !prev[parentId],
+    }));
+  };
+
   return (
     <div className="mx-auto max-w-6xl space-y-8 pb-16">
-      {/* BACK BUTTON & HEADER */}
       <div className="flex flex-col gap-4">
         <button
           type="button"
@@ -303,7 +503,7 @@ export default function AddProductPage() {
         </button>
         <div>
           <h1 className="text-3xl font-black">Add New Product</h1>
-          <p className="mt-2 text-gray-500">Enterprise-grade professional product creation with dedicated item attributes</p>
+          <p className="mt-2 text-gray-500">Enterprise product creation with elegant modern category selector</p>
         </div>
       </div>
 
@@ -362,28 +562,118 @@ export default function AddProductPage() {
               placeholder="SKU (Stock Keeping Unit)"
               className="rounded-xl border p-3 outline-none focus:ring-2 focus:ring-black"
             />
-            <select
-              name="category"
-              value={form.category}
-              onChange={handleChange}
-              className="rounded-xl border p-3 outline-none focus:ring-2 focus:ring-black bg-white"
-              required
-            >
-              <option value="">Select Category</option>
-              {categoryLoading ? (
-                <option>Loading...</option>
-              ) : (
-                categories.map((cat) => (
-                  <option key={cat._id} value={cat._id}>
-                    {cat.name}
-                  </option>
-                ))
+            
+            {/* Custom Interactive Main Category Dropdown */}
+            <div className="relative w-full" ref={categoryDropdownRef}>
+              <div
+                onClick={() => setIsCategoryOpen(!isCategoryOpen)}
+                className={`flex w-full items-center justify-between rounded-xl border bg-white p-3.5 cursor-pointer transition-all shadow-sm ${
+                  isCategoryOpen ? "border-black ring-2 ring-black/10" : "border-gray-200 hover:border-gray-300"
+                }`}
+              >
+                <div className="flex items-center gap-2.5 overflow-hidden">
+                  <FolderTree size={18} className="text-gray-400 shrink-0" />
+                  <span className={`font-medium truncate ${selectedCategoryObj ? "text-gray-900" : "text-gray-400"}`}>
+                    {selectedCategoryObj ? selectedCategoryObj.name : "Select Product Category"}
+                  </span>
+                </div>
+                <div className="flex items-center gap-1.5 shrink-0 pl-2">
+                  {selectedCategoryObj && (
+                    <span className="rounded-full bg-gray-100 p-1 text-gray-600 hover:bg-gray-200" onClick={(e) => { e.stopPropagation(); setForm(p => ({...p, category: ""})); }}>
+                      <X size={12} />
+                    </span>
+                  )}
+                  <ChevronDown size={18} className={`text-gray-500 transition-transform duration-200 ${isCategoryOpen ? "rotate-180" : ""}`} />
+                </div>
+              </div>
+
+              {isCategoryOpen && (
+                <div className="absolute left-0 right-0 z-50 mt-2 max-h-80 overflow-y-auto rounded-2xl border border-gray-100 bg-white p-2 shadow-2xl animate-in fade-in zoom-in-95 duration-150">
+                  {categoryLoading ? (
+                    <div className="py-8 text-center text-sm text-gray-400">Loading categories...</div>
+                  ) : parentCategories.length === 0 ? (
+                    <div className="py-8 text-center text-sm text-gray-400">No categories found</div>
+                  ) : (
+                    <div className="space-y-1">
+                      {parentCategories.map((parentCat) => {
+                        const subCats = getSubCategories(parentCat._id);
+                        const isExpanded = expandedParents[parentCat._id];
+                        const isSelected = form.category === parentCat._id;
+
+                        return (
+                          <div key={parentCat._id} className="overflow-hidden rounded-xl">
+                            {/* Main category click action: expands or collapses subcategories seamlessly, and selects category */}
+                            <div
+                              className={`group flex items-center justify-between rounded-xl px-3 py-2.5 text-sm transition-all cursor-pointer ${
+                                isSelected 
+                                  ? "bg-black text-white font-semibold shadow-sm" 
+                                  : "hover:bg-gray-50 text-gray-800"
+                              }`}
+                              onClick={() => {
+                                setForm((prev) => ({ ...prev, category: parentCat._id }));
+                                if (subCats.length > 0) {
+                                  toggleParentExpand(parentCat._id);
+                                } else {
+                                  setIsCategoryOpen(false);
+                                }
+                              }}
+                            >
+                              <span className="flex-1 font-medium">{parentCat.name}</span>
+                              <div className="flex items-center gap-2">
+                                {isSelected && <Check size={16} className="text-white" />}
+                                {subCats.length > 0 && (
+                                  <div
+                                    onClick={(e) => {
+                                      e.stopPropagation();
+                                      toggleParentExpand(parentCat._id);
+                                    }}
+                                    className={`rounded-lg p-1 transition-colors ${isSelected ? "hover:bg-gray-800 text-white" : "hover:bg-gray-200 text-gray-400"}`}
+                                  >
+                                    <ChevronDown size={16} className={`transition-transform duration-200 ${isExpanded ? "rotate-180" : ""}`} />
+                                  </div>
+                                )}
+                              </div>
+                            </div>
+
+                            {/* Sub Categories shown smoothly when main category is expanded */}
+                            {subCats.length > 0 && isExpanded && (
+                              <div className="ml-3 my-1 pl-3 border-l-2 border-gray-100 space-y-1 animate-in slide-in-from-top-2 duration-200">
+                                {subCats.map((subCat) => {
+                                  const isSubSelected = form.category === subCat._id;
+                                  return (
+                                    <div
+                                      key={subCat._id}
+                                      className={`flex items-center justify-between rounded-lg px-3 py-2 text-sm transition-all cursor-pointer ${
+                                        isSubSelected 
+                                          ? "bg-gray-900 text-white font-semibold shadow-sm" 
+                                          : "hover:bg-gray-50 text-gray-600 hover:text-gray-900"
+                                      }`}
+                                      onClick={(e) => {
+                                        e.stopPropagation();
+                                        setForm((prev) => ({ ...prev, category: subCat._id }));
+                                        setIsCategoryOpen(false);
+                                      }}
+                                    >
+                                      <span className="truncate">{subCat.name}</span>
+                                      {isSubSelected && <Check size={14} className="text-white shrink-0 ml-2" />}
+                                    </div>
+                                  );
+                                })}
+                              </div>
+                            )}
+                          </div>
+                        );
+                      })}
+                    </div>
+                  )}
+                </div>
               )}
-            </select>
+            </div>
+
           </div>
         </section>
 
-        {/* 1. MOBILE SPECIFICATIONS */}
+        {/* SPECIFIC CATEGORY ATTRIBUTES */}
         {isMobile && (
           <section className="rounded-2xl border border-blue-100 bg-blue-50/40 p-6 space-y-6">
             <div className="flex items-center gap-2 text-blue-600 font-bold text-lg">
@@ -392,401 +682,303 @@ export default function AddProductPage() {
             <div className="grid gap-5 md:grid-cols-3">
               <div>
                 <label className="text-sm font-semibold text-gray-700">Storage Capacity</label>
-                <input
-                  type="text"
-                  name="storageCapacity"
-                  value={form.storageCapacity}
-                  onChange={handleChange}
-                  placeholder="e.g. 128GB / 256GB"
-                  className="mt-2 w-full rounded-xl border p-3 outline-none bg-white"
-                />
+                <input type="text" name="storageCapacity" value={form.storageCapacity} onChange={handleChange} placeholder="e.g. 128GB" className="mt-2 w-full rounded-xl border p-3 bg-white outline-none" />
               </div>
               <div>
                 <label className="text-sm font-semibold text-gray-700">RAM Size</label>
-                <input
-                  type="text"
-                  name="ramSize"
-                  value={form.ramSize}
-                  onChange={handleChange}
-                  placeholder="e.g. 8GB / 12GB"
-                  className="mt-2 w-full rounded-xl border p-3 outline-none bg-white"
-                />
+                <input type="text" name="ramSize" value={form.ramSize} onChange={handleChange} placeholder="e.g. 8GB" className="mt-2 w-full rounded-xl border p-3 bg-white outline-none" />
               </div>
               <div>
                 <label className="text-sm font-semibold text-gray-700">Warranty</label>
-                <input
-                  type="text"
-                  name="warrantyPeriod"
-                  value={form.warrantyPeriod}
-                  onChange={handleChange}
-                  placeholder="e.g. 1 Year Official Warranty"
-                  className="mt-2 w-full rounded-xl border p-3 outline-none bg-white"
-                />
+                <input type="text" name="warrantyPeriod" value={form.warrantyPeriod} onChange={handleChange} placeholder="1 Year" className="mt-2 w-full rounded-xl border p-3 bg-white outline-none" />
               </div>
             </div>
           </section>
         )}
 
-        {/* 2. IPAD / TABLET SPECIFICATIONS */}
         {isIpad && (
           <section className="rounded-2xl border border-sky-100 bg-sky-50/40 p-6 space-y-6">
             <div className="flex items-center gap-2 text-sky-600 font-bold text-lg">
-              <Tablet size={20} /> iPad & Tablet Attributes
+              <Tablet size={20} /> iPad Attributes
             </div>
             <div className="grid gap-5 md:grid-cols-2">
-              <div>
-                <label className="text-sm font-semibold text-gray-700">Storage Capacity</label>
-                <input
-                  type="text"
-                  name="storageCapacity"
-                  value={form.storageCapacity}
-                  onChange={handleChange}
-                  placeholder="e.g. 64GB / 256GB Wi-Fi + Cellular"
-                  className="mt-2 w-full rounded-xl border p-3 outline-none bg-white"
-                />
-              </div>
-              <div>
-                <label className="text-sm font-semibold text-gray-700">Screen Size</label>
-                <input
-                  type="text"
-                  name="screenSize"
-                  value={form.screenSize}
-                  onChange={handleChange}
-                  placeholder="e.g. 11-inch Liquid Retina"
-                  className="mt-2 w-full rounded-xl border p-3 outline-none bg-white"
-                />
-              </div>
+              <input type="text" name="storageCapacity" value={form.storageCapacity} onChange={handleChange} placeholder="Storage (e.g. 256GB)" className="rounded-xl border p-3 bg-white outline-none" />
+              <input type="text" name="screenSize" value={form.screenSize} onChange={handleChange} placeholder="Screen Size (e.g. 11-inch)" className="rounded-xl border p-3 bg-white outline-none" />
             </div>
           </section>
         )}
 
-        {/* 3. LAPTOP SPECIFICATIONS */}
         {isLaptop && (
           <section className="rounded-2xl border border-cyan-100 bg-cyan-50/40 p-6 space-y-6">
             <div className="flex items-center gap-2 text-cyan-700 font-bold text-lg">
               <LaptopIcon size={20} /> Laptop Attributes
             </div>
             <div className="grid gap-5 md:grid-cols-3">
-              <div>
-                <label className="text-sm font-semibold text-gray-700">Processor</label>
-                <input
-                  type="text"
-                  name="processorType"
-                  value={form.processorType}
-                  onChange={handleChange}
-                  placeholder="e.g. Apple M3 / Intel Core i7"
-                  className="mt-2 w-full rounded-xl border p-3 outline-none bg-white"
-                />
-              </div>
-              <div>
-                <label className="text-sm font-semibold text-gray-700">RAM & Storage</label>
-                <input
-                  type="text"
-                  name="storageCapacity"
-                  value={form.storageCapacity}
-                  onChange={handleChange}
-                  placeholder="e.g. 16GB RAM / 512GB SSD"
-                  className="mt-2 w-full rounded-xl border p-3 outline-none bg-white"
-                />
-              </div>
-              <div>
-                <label className="text-sm font-semibold text-gray-700">Warranty</label>
-                <input
-                  type="text"
-                  name="warrantyPeriod"
-                  value={form.warrantyPeriod}
-                  onChange={handleChange}
-                  placeholder="e.g. 2 Years International Warranty"
-                  className="mt-2 w-full rounded-xl border p-3 outline-none bg-white"
-                />
-              </div>
+              <input type="text" name="processorType" value={form.processorType} onChange={handleChange} placeholder="Processor (e.g. M3)" className="rounded-xl border p-3 bg-white outline-none" />
+              <input type="text" name="storageCapacity" value={form.storageCapacity} onChange={handleChange} placeholder="RAM/SSD (e.g. 16GB/512GB)" className="rounded-xl border p-3 bg-white outline-none" />
+              <input type="text" name="warrantyPeriod" value={form.warrantyPeriod} onChange={handleChange} placeholder="Warranty" className="rounded-xl border p-3 bg-white outline-none" />
             </div>
           </section>
         )}
 
-        {/* 4. SHIRT SPECIFICATIONS */}
-        {isShirt && (
+        {(isShirt || isTShirt) && (
           <section className="rounded-2xl border border-rose-100 bg-rose-50/40 p-6 space-y-6">
             <div className="flex items-center gap-2 text-rose-600 font-bold text-lg">
-              <Shirt size={20} /> Shirt Attributes
+              <Shirt size={20} /> Shirt / T-Shirt Attributes
             </div>
             <div className="grid gap-5 md:grid-cols-2">
-              <div>
-                <label className="text-sm font-semibold text-gray-700">Fabric Type</label>
-                <input
-                  type="text"
-                  name="fabricType"
-                  value={form.fabricType}
-                  onChange={handleChange}
-                  placeholder="e.g. Oxford Cotton / Linen"
-                  className="mt-2 w-full rounded-xl border p-3 outline-none bg-white"
-                />
-              </div>
-              <div>
-                <label className="text-sm font-semibold text-gray-700">Fit Type</label>
-                <input
-                  type="text"
-                  name="fitType"
-                  value={form.fitType}
-                  onChange={handleChange}
-                  placeholder="e.g. Tailored Fit / Regular Fit"
-                  className="mt-2 w-full rounded-xl border p-3 outline-none bg-white"
-                />
-              </div>
+              <input type="text" name="fabricType" value={form.fabricType} onChange={handleChange} placeholder="Fabric Type (e.g. Cotton)" className="rounded-xl border p-3 bg-white outline-none" />
+              <input type="text" name="fitType" value={form.fitType} onChange={handleChange} placeholder="Fit Type (e.g. Regular Fit)" className="rounded-xl border p-3 bg-white outline-none" />
             </div>
           </section>
         )}
 
-        {/* 5. T-SHIRT SPECIFICATIONS */}
-        {isTShirt && (
-          <section className="rounded-2xl border border-pink-100 bg-pink-50/40 p-6 space-y-6">
-            <div className="flex items-center gap-2 text-pink-600 font-bold text-lg">
-              <Shirt size={20} /> T-Shirt Attributes
-            </div>
-            <div className="grid gap-5 md:grid-cols-2">
-              <div>
-                <label className="text-sm font-semibold text-gray-700">Fabric Quality</label>
-                <input
-                  type="text"
-                  name="fabricType"
-                  value={form.fabricType}
-                  onChange={handleChange}
-                  placeholder="e.g. 100% Combed Cotton 180GSM"
-                  className="mt-2 w-full rounded-xl border p-3 outline-none bg-white"
-                />
-              </div>
-              <div>
-                <label className="text-sm font-semibold text-gray-700">Fit Type</label>
-                <input
-                  type="text"
-                  name="fitType"
-                  value={form.fitType}
-                  onChange={handleChange}
-                  placeholder="e.g. Oversized / Regular Fit"
-                  className="mt-2 w-full rounded-xl border p-3 outline-none bg-white"
-                />
-              </div>
-            </div>
-          </section>
-        )}
-
-        {/* 6. PANT SPECIFICATIONS */}
         {isPant && (
           <section className="rounded-2xl border border-indigo-100 bg-indigo-50/40 p-6 space-y-6">
             <div className="flex items-center gap-2 text-indigo-600 font-bold text-lg">
-              <Scissors size={20} /> Pant & Trouser Attributes
+              <Scissors size={20} /> Pant Attributes
             </div>
             <div className="grid gap-5 md:grid-cols-2">
-              <div>
-                <label className="text-sm font-semibold text-gray-700">Fabric Type</label>
-                <input
-                  type="text"
-                  name="fabricType"
-                  value={form.fabricType}
-                  onChange={handleChange}
-                  placeholder="e.g. Stretch Denim / Twill Cotton"
-                  className="mt-2 w-full rounded-xl border p-3 outline-none bg-white"
-                />
-              </div>
-              <div>
-                <label className="text-sm font-semibold text-gray-700">Waist Rise</label>
-                <input
-                  type="text"
-                  name="waistRise"
-                  value={form.waistRise}
-                  onChange={handleChange}
-                  placeholder="e.g. Mid Rise / Slim Tapered"
-                  className="mt-2 w-full rounded-xl border p-3 outline-none bg-white"
-                />
-              </div>
+              <input type="text" name="fabricType" value={form.fabricType} onChange={handleChange} placeholder="Fabric Type" className="rounded-xl border p-3 bg-white outline-none" />
+              <input type="text" name="waistRise" value={form.waistRise} onChange={handleChange} placeholder="Waist Rise" className="rounded-xl border p-3 bg-white outline-none" />
             </div>
           </section>
         )}
 
-        {/* 7. UNDERWEAR SPECIFICATIONS */}
-        {isUnderwear && (
-          <section className="rounded-2xl border border-orange-100 bg-orange-50/40 p-6 space-y-6">
-            <div className="flex items-center gap-2 text-orange-600 font-bold text-lg">
-              <Package size={20} /> Underwear / Innerwear Attributes
-            </div>
-            <div>
-              <label className="text-sm font-semibold text-gray-700">Fabric Composition</label>
-              <input
-                type="text"
-                name="fabricType"
-                value={form.fabricType}
-                onChange={handleChange}
-                placeholder="e.g. Modal Cotton / Breathable Spandex"
-                className="mt-2 w-full rounded-xl border p-3 outline-none bg-white"
-              />
-            </div>
-          </section>
-        )}
-
-        {/* 8. WATCH SPECIFICATIONS */}
         {isWatch && (
           <section className="rounded-2xl border border-purple-100 bg-purple-50/40 p-6 space-y-6">
             <div className="flex items-center gap-2 text-purple-600 font-bold text-lg">
               <Watch size={20} /> Watch Attributes
             </div>
             <div className="grid gap-5 md:grid-cols-2">
-              <div>
-                <label className="text-sm font-semibold text-gray-700">Strap Type</label>
-                <input
-                  type="text"
-                  name="strapType"
-                  value={form.strapType}
-                  onChange={handleChange}
-                  placeholder="e.g. Stainless Steel / Silicone Band"
-                  className="mt-2 w-full rounded-xl border p-3 outline-none bg-white"
-                />
-              </div>
-              <div>
-                <label className="text-sm font-semibold text-gray-700">Material / Build</label>
-                <input
-                  type="text"
-                  name="material"
-                  value={form.material}
-                  onChange={handleChange}
-                  placeholder="e.g. Sapphire Crystal / Alloy Case"
-                  className="mt-2 w-full rounded-xl border p-3 outline-none bg-white"
-                />
-              </div>
+              <input type="text" name="strapType" value={form.strapType} onChange={handleChange} placeholder="Strap Type" className="rounded-xl border p-3 bg-white outline-none" />
+              <input type="text" name="material" value={form.material} onChange={handleChange} placeholder="Material" className="rounded-xl border p-3 bg-white outline-none" />
             </div>
           </section>
         )}
 
-        {/* 9. CAP SPECIFICATIONS */}
-        {isCap && (
-          <section className="rounded-2xl border border-teal-100 bg-teal-50/40 p-6 space-y-6">
-            <div className="flex items-center gap-2 text-teal-600 font-bold text-lg">
-              <Crown size={20} /> Cap & Hat Attributes
-            </div>
-            <div>
-              <label className="text-sm font-semibold text-gray-700">Cap Style / Material</label>
-              <input
-                type="text"
-                name="capStyle"
-                value={form.capStyle}
-                onChange={handleChange}
-                placeholder="e.g. Snapback / Curved Brim Cotton"
-                className="mt-2 w-full rounded-xl border p-3 outline-none bg-white"
-              />
-            </div>
-          </section>
-        )}
-
-        {/* 10. SHOES SPECIFICATIONS */}
         {isShoes && (
           <section className="rounded-2xl border border-amber-100 bg-amber-50/40 p-6 space-y-6">
             <div className="flex items-center gap-2 text-amber-600 font-bold text-lg">
-              <Footprints size={20} /> Shoes & Footwear Attributes
+              <Footprints size={20} /> Shoe Attributes
             </div>
-            <div>
-              <label className="text-sm font-semibold text-gray-700">Sole Material / Cushioning</label>
-              <input
-                type="text"
-                name="soleMaterial"
-                value={form.soleMaterial}
-                onChange={handleChange}
-                placeholder="e.g. Phylon Rubber Sole / Air Cushion"
-                className="mt-2 w-full rounded-xl border p-3 outline-none bg-white"
-              />
-            </div>
+            <input type="text" name="soleMaterial" value={form.soleMaterial} onChange={handleChange} placeholder="Sole Material" className="w-full rounded-xl border p-3 bg-white outline-none" />
           </section>
         )}
 
-        {/* 11. ACCESSORIES SPECIFICATIONS */}
-        {isAccessories && (
-          <section className="rounded-2xl border border-violet-100 bg-violet-50/40 p-6 space-y-6">
-            <div className="flex items-center gap-2 text-violet-600 font-bold text-lg">
-              <Glasses size={20} /> General Accessories Attributes
-            </div>
-            <div>
-              <label className="text-sm font-semibold text-gray-700">Primary Material</label>
-              <input
-                type="text"
-                name="material"
-                value={form.material}
-                onChange={handleChange}
-                placeholder="e.g. Titanium / Premium Leather"
-                className="mt-2 w-full rounded-xl border p-3 outline-none bg-white"
-              />
-            </div>
-          </section>
-        )}
-
-        {/* VARIANTS (SIZES & COLORS) - Hidden if Digital */}
+        {/* VARIANTS: SIZES & COLORS WITH ADD & DELETE OPTIONS */}
         {!form.isDigital && (
-          <section className="border-t pt-6">
+          <section className="border-t pt-6 space-y-6">
             <div className="grid gap-8 md:grid-cols-2">
               
-              {/* SIZES: Hide for Mobile, iPad, Laptop, Watch, Accessories */}
-              {!isMobile && !isIpad && !isLaptop && !isWatch && !isAccessories && (
-                <div>
-                  <div className="mb-3 flex items-center justify-between">
+              {/* SIZES SECTION */}
+              {hasSizes && (
+                <div className="space-y-4">
+                  <div className="flex items-center justify-between">
                     <div className="flex items-center gap-2">
                       <Layers size={18} />
-                      <h3 className="text-lg font-bold">
-                        {isPant ? "Pant Waist Sizes" : isShoes ? "Shoe Sizes" : isUnderwear ? "Underwear Sizes" : "Available Sizes"}
-                      </h3>
+                      <h3 className="text-lg font-bold">Manage Sizes</h3>
                     </div>
                   </div>
-                  
-                  <div className="flex flex-wrap gap-2">
-                    {(isPant ? AVAILABLE_PANT_SIZES : isShoes ? AVAILABLE_SHOE_SIZES : isUnderwear ? AVAILABLE_UNDERWEAR_SIZES : AVAILABLE_SIZES).map((size) => {
+
+                  {/* Add Custom Size Input */}
+                  <div className="flex gap-2">
+                    <input
+                      type="text"
+                      value={newSizeInput}
+                      onChange={(e) => setNewSizeInput(e.target.value)}
+                      placeholder="Add custom size (e.g. 3XL)"
+                      className="flex-1 rounded-xl border p-2.5 text-sm outline-none focus:ring-2 focus:ring-black"
+                    />
+                    <button
+                      type="button"
+                      onClick={handleAddCustomSize}
+                      className="flex items-center gap-1 rounded-xl bg-black px-4 py-2.5 text-sm font-semibold text-white hover:bg-gray-800 transition"
+                    >
+                      <Plus size={16} /> Add Size
+                    </button>
+                  </div>
+
+                  {/* Available Sizes Chips with Delete Option */}
+                  <div className="flex flex-wrap gap-2 pt-2">
+                    {availableSizesList.map((size) => {
                       const isSelected = selectedSizes.includes(size);
                       return (
-                        <button
-                          type="button"
+                        <div
                           key={size}
-                          onClick={() => toggleSize(size)}
-                          className={`rounded-xl border px-4 py-2 text-sm font-semibold transition ${
+                          className={`flex items-center gap-1.5 rounded-xl border px-3 py-1.5 text-sm font-semibold transition ${
                             isSelected
-                              ? "bg-black text-white border-black"
+                              ? "bg-black text-white border-black shadow"
                               : "bg-gray-50 text-gray-700 hover:bg-gray-100"
                           }`}
                         >
-                          {size}
-                        </button>
+                          <span onClick={() => toggleSize(size)} className="cursor-pointer">{size}</span>
+                          <button
+                            type="button"
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              handleDeleteSize(size);
+                            }}
+                            className="ml-1 text-gray-400 hover:text-red-500 transition"
+                            title="Delete Size"
+                          >
+                            <X size={14} />
+                          </button>
+                        </div>
                       );
                     })}
                   </div>
                 </div>
               )}
 
-              {/* COLORS: Show for all physical products (takes full width if sizes hidden) */}
-              <div className={isMobile || isIpad || isLaptop || isWatch || isAccessories ? "md:col-span-2" : ""}>
-                <div className="mb-3 flex items-center gap-2">
-                  <Palette size={18} />
-                  <h3 className="text-lg font-bold">Available Colors</h3>
+              {/* COLORS SECTION */}
+              <div className={!hasSizes ? "md:col-span-2" : ""}>
+                <div className="flex items-center justify-between mb-4">
+                  <div className="flex items-center gap-2">
+                    <Palette size={18} />
+                    <h3 className="text-lg font-bold">Manage Colors</h3>
+                  </div>
                 </div>
-                <div className="flex flex-wrap gap-2">
-                  {AVAILABLE_COLORS.map((col) => {
+
+                {/* Add Custom Color Inputs */}
+                <div className="flex gap-2">
+                  <input
+                    type="text"
+                    value={newColorNameInput}
+                    onChange={(e) => setNewColorNameInput(e.target.value)}
+                    placeholder="Color Name (e.g. Navy Blue)"
+                    className="flex-1 rounded-xl border p-2.5 text-sm outline-none focus:ring-2 focus:ring-black"
+                  />
+                  <input
+                    type="color"
+                    value={newColorHexInput}
+                    onChange={(e) => setNewColorHexInput(e.target.value)}
+                    className="h-11 w-12 cursor-pointer rounded-xl border bg-white p-1"
+                  />
+                  <button
+                    type="button"
+                    onClick={handleAddCustomColor}
+                    className="flex items-center gap-1 rounded-xl bg-black px-4 py-2.5 text-sm font-semibold text-white hover:bg-gray-800 transition"
+                  >
+                    <Plus size={16} /> Add Color
+                  </button>
+                </div>
+
+                {/* Available Colors Chips with Delete Option */}
+                <div className="flex flex-wrap gap-2 pt-2">
+                  {availableColorsList.map((col) => {
                     const isSelected = selectedColors.includes(col.name);
                     return (
-                      <button
-                        type="button"
+                      <div
                         key={col.name}
-                        onClick={() => toggleColor(col.name)}
-                        className={`flex items-center gap-2 rounded-xl border px-4 py-2 text-sm font-semibold transition ${
+                        className={`flex items-center gap-2 rounded-xl border px-3 py-1.5 text-sm font-semibold transition ${
                           isSelected
-                            ? "bg-black text-white border-black"
+                            ? "bg-black text-white border-black shadow"
                             : "bg-gray-50 text-gray-700 hover:bg-gray-100"
                         }`}
                       >
                         <span
-                          className="h-3 w-3 rounded-full border border-gray-300"
+                          className="h-3 w-3 rounded-full border border-gray-300 cursor-pointer"
                           style={{ backgroundColor: col.hex }}
+                          onClick={() => toggleColor(col.name)}
                         />
-                        {col.name}
-                      </button>
+                        <span onClick={() => toggleColor(col.name)} className="cursor-pointer">{col.name}</span>
+                        <button
+                          type="button"
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            handleDeleteColor(col.name);
+                          }}
+                          className="ml-1 text-gray-400 hover:text-red-500 transition"
+                          title="Delete Color"
+                        >
+                          <X size={14} />
+                        </button>
+                      </div>
                     );
                   })}
                 </div>
               </div>
 
             </div>
+
+            {/* SIZE-COLOR COMBINATION STOCK MATRIX */}
+            {selectedColors.length > 0 && (hasSizes ? selectedSizes.length > 0 : true) && (
+              <div className="rounded-2xl border border-gray-200 bg-gray-50/60 p-6 space-y-4 mt-6">
+                <div>
+                  <h3 className="text-base font-bold text-gray-900">Per-Variant Stock Allocation (Pcs per Size & Color)</h3>
+                  <p className="text-xs text-gray-500 mt-1">
+                    Enter the exact quantity available for each combination. Total stock will update automatically.
+                  </p>
+                </div>
+
+                <div className="overflow-x-auto">
+                  <table className="w-full text-left border-collapse">
+                    <thead>
+                      <tr className="border-b border-gray-200 text-xs font-semibold text-gray-500 uppercase tracking-wider">
+                        {hasSizes && <th className="py-3 px-4">Size</th>}
+                        <th className="py-3 px-4">Color</th>
+                        <th className="py-3 px-4">Quantity (Pcs)</th>
+                      </tr>
+                    </thead>
+                    <tbody className="divide-y divide-gray-200 text-sm">
+                      {hasSizes ? (
+                        selectedSizes.map((size) =>
+                          selectedColors.map((color) => (
+                            <tr key={`${size}-${color}`} className="hover:bg-white/60 transition">
+                              <td className="py-3 px-4 font-bold text-gray-800">{size}</td>
+                              <td className="py-3 px-4 flex items-center gap-2 text-gray-700">
+                                <span
+                                  className="h-3 w-3 rounded-full border border-gray-300"
+                                  style={{
+                                    backgroundColor: availableColorsList.find((c) => c.name === color)?.hex || "#000",
+                                  }}
+                                />
+                                {color}
+                              </td>
+                              <td className="py-3 px-4">
+                                <input
+                                  type="number"
+                                  min="0"
+                                  value={sizeColorStock[size]?.[color] ?? ""}
+                                  onChange={(e) => handleStockChange(size, color, e.target.value)}
+                                  placeholder="0 pcs"
+                                  className="w-32 rounded-lg border bg-white p-2 text-sm outline-none focus:ring-2 focus:ring-black"
+                                />
+                              </td>
+                            </tr>
+                          ))
+                        )
+                      ) : (
+                        selectedColors.map((color) => (
+                          <tr key={color} className="hover:bg-white/60 transition">
+                            <td className="py-3 px-4 flex items-center gap-2 text-gray-700">
+                              <span
+                                className="h-3 w-3 rounded-full border border-gray-300"
+                                style={{
+                                  backgroundColor: availableColorsList.find((c) => c.name === color)?.hex || "#000",
+                                }}
+                              />
+                              {color}
+                            </td>
+                            <td className="py-3 px-4">
+                              <input
+                                type="number"
+                                min="0"
+                                value={sizeColorStock["Default"]?.[color] ?? ""}
+                                onChange={(e) => handleStockChange("Default", color, e.target.value)}
+                                placeholder="0 pcs"
+                                className="w-32 rounded-lg border bg-white p-2 text-sm outline-none focus:ring-2 focus:ring-black"
+                              />
+                            </td>
+                          </tr>
+                        ))
+                      )}
+                    </tbody>
+                  </table>
+                </div>
+              </div>
+            )}
           </section>
         )}
 
@@ -821,14 +1013,14 @@ export default function AddProductPage() {
               <div key={index} className="flex items-center gap-3">
                 <input
                   type="text"
-                  placeholder="Key (e.g. Model / Material)"
+                  placeholder="Key (e.g. Material)"
                   value={spec.key}
                   onChange={(e) => handleSpecChange(index, "key", e.target.value)}
                   className="flex-1 rounded-xl border p-3 outline-none focus:ring-2 focus:ring-black"
                 />
                 <input
                   type="text"
-                  placeholder="Value (e.g. Pro / Cotton)"
+                  placeholder="Value (e.g. 100% Cotton)"
                   value={spec.value}
                   onChange={(e) => handleSpecChange(index, "value", e.target.value)}
                   className="flex-1 rounded-xl border p-3 outline-none focus:ring-2 focus:ring-black"
@@ -889,14 +1081,15 @@ export default function AddProductPage() {
             </div>
 
             <div>
-              <label className="text-sm font-semibold">Stock Quantity</label>
+              <label className="text-sm font-semibold">Total Stock Quantity (Auto)</label>
               <input
                 type="number"
                 name="stock"
                 value={form.stock}
                 onChange={handleChange}
-                className="mt-2 w-full rounded-xl border p-3 outline-none focus:ring-2 focus:ring-black"
-                placeholder="50"
+                className="mt-2 w-full rounded-xl border p-3 outline-none focus:ring-2 focus:ring-black bg-gray-50 cursor-not-allowed"
+                placeholder="0"
+                readOnly
                 required
               />
             </div>

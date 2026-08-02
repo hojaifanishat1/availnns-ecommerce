@@ -6,6 +6,7 @@ import { usePathname } from "next/navigation";
 import {
   Home,
   Grid2X2,
+  ShoppingBag,
   Flame,
   Tag,
   Sparkles,
@@ -25,6 +26,11 @@ const navItems: NavItem[] = [
     name: "Home",
     href: "/",
     icon: "home",
+  },
+  {
+    name: "Shop",
+    href: "/shop",
+    icon: "shop",
   },
   {
     name: "Category",
@@ -72,6 +78,8 @@ export default function Navigation() {
     switch (icon) {
       case "home":
         return <Home size={22} className={active ? "text-white" : "text-blue-500"} />;
+      case "shop":
+        return <ShoppingBag size={22} className={active ? "text-white" : "text-indigo-500"} />;
       case "category":
         return <Grid2X2 size={22} className={active ? "text-white" : "text-emerald-500"} />;
       case "tag":

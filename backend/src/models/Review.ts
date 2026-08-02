@@ -37,4 +37,9 @@ const ReviewSchema = new Schema<IReview>(
   }
 );
 
-export default mongoose.model<IReview>("Review", ReviewSchema);
+// Prevent duplicate reviews from the same user on the same product
+ReviewSchema.index({ product: 1, user: 1 }, { unique: true });
+
+const Review = mongoose.models.Review || mongoose.model<IReview>("Review", ReviewSchema);
+
+export default Review;
