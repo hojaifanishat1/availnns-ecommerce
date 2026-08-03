@@ -4,7 +4,7 @@ import {
 
 
 // =========================
-// REDUCERS
+// EXISTING REDUCERS
 // =========================
 
 import productReducer 
@@ -17,6 +17,19 @@ from "./slices/filterSlice";
 
 import categoryReducer 
 from "./slices/categorySlice";
+
+
+
+// =========================
+// PRODUCT WIZARD REDUCERS
+// =========================
+
+import productFormReducer
+from "./product/productFormSlice";
+
+
+import productWizardReducer
+from "./product/productWizardSlice";
 
 
 
@@ -41,6 +54,18 @@ configureStore({
 
     // CATEGORIES
     category: categoryReducer,
+
+
+
+    // ADMIN PRODUCT FORM
+    productForm:
+      productFormReducer,
+
+
+
+    // ADMIN PRODUCT WIZARD
+    productWizard:
+      productWizardReducer,
 
 
   },

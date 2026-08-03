@@ -23,3 +23,15 @@ export interface Category {
   children?: Category[];
 
 }
+
+export interface CategoryOption {
+
+  _id: string;
+
+  name: string;
+
+  slug: string;
+
+  parent?: string | null;
+
+}

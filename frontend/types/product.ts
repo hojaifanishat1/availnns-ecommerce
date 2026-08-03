@@ -1,121 +1,171 @@
-export interface ProductImage {
-  url:string;
-  public_id:string;
+import {
+  ProductShipping
+} from "./shipping";
+
+
+import {
+  ProductVariant
+} from "./variant";
+
+
+import {
+  ProductMedia
+} from "./media";
+
+
+import {
+  ProductSeo
+} from "./seo";
+
+
+import {
+  ProductSpecification
+} from "./specification";
+
+
+export type ProductStatus =
+  | "draft"
+  | "active"
+  | "inactive"
+  | "archived";
+
+
+
+export interface ProductPricing {
+
+  price: number;
+
+
+  discountPrice?: number;
+
+
+  currency?: string;
+
+
+  discountStartDate?: string;
+
+
+  discountEndDate?: string;
+
 }
 
 
-export interface Specification {
-  key:string;
-  value:string;
+
+export interface ProductInventory {
+
+  stock: number;
+
+
+  lowStockThreshold: number;
+
+
+  trackInventory: boolean;
+
+
+  allowBackOrder: boolean;
+
 }
+
+
+
+export interface ProductAttribute {
+
+  name: string;
+
+
+  value: string;
+
+}
+
+
+
+export interface ProductFlags {
+
+  isFeatured: boolean;
+
+
+  isBestSeller: boolean;
+
+
+  isNewArrival: boolean;
+
+
+  isDigital: boolean;
+
+}
+
 
 
 export interface Product {
 
-  _id:string;
-
-  name:string;
-
-  slug:string;
-
-  description:string;
+  _id?: string;
 
 
-  category:
-  | string
-  | {
-      _id:string;
-      name:string;
-    };
+  name: string;
 
 
-  brand:string;
+  description: string;
 
 
-  price:number;
-
-  discountPrice:number;
+  brand?: string;
 
 
-  discountPercentage?:number;
+  sku?: string;
 
 
-  discountStartDate?:string;
-
-  discountEndDate?:string;
+  category: string;
 
 
-  stock:number;
+  subCategory?: string;
 
 
-  sku:string;
-
-
-  images:ProductImage[];
-
-
-  isNewArrival:boolean;
-
-  isFeatured:boolean;
-
-  isBestSeller:boolean;
-  
-  isDeal:boolean; // <-- Added isDeal here
-
-  isPublished:boolean;
-
-
-  rating:number;
-
-  numReviews:number;
-
-
-  tags:string[];
+  tags: string[];
 
 
 
-  // Product Variants
-
-  sizes?:string[];
-
-  colors?:string[];
+  images: ProductMedia[];
 
 
 
-  // Specifications
-
-  specifications?:Specification[];
+  variants: ProductVariant[];
 
 
 
-  // Electronics
-
-  storageCapacity?:string;
-
-  ramSize?:string;
-
-  processorType?:string;
+  pricing: ProductPricing;
 
 
 
-  // Fashion
-
-  fabricType?:string;
-
-  material?:string;
+  inventory: ProductInventory;
 
 
 
-  warrantyPeriod?:string;
+  shipping: ProductShipping;
 
 
 
-  freeShipping?:boolean;
+  seo: ProductSeo;
 
 
 
-  createdAt:string;
+  specifications: ProductSpecification[];
 
-  updatedAt:string;
+
+
+  attributes: ProductAttribute[];
+
+
+
+  flags: ProductFlags;
+
+
+
+  status: ProductStatus;
+
+
+
+  createdAt?: string;
+
+
+  updatedAt?: string;
 
 }

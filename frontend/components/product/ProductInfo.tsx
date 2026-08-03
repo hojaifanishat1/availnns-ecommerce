@@ -13,6 +13,12 @@ import {
   Share2,
   PackageCheck,
   AlertCircle,
+  Copy,
+  Check,
+  ChevronDown,
+  ChevronUp,
+  RefreshCw,
+  Award,
 } from "lucide-react";
 import { useState } from "react";
 import { useRouter } from "next/navigation";
@@ -38,6 +44,12 @@ export default function ProductInfo({
     product.colors?.[0] || ""
   );
 
+  // States for interactive features
+  const [copied, setCopied] = useState(false);
+  const [isWishlisted, setIsWishlisted] = useState(false);
+  const [showAllSpecs, setShowAllSpecs] = useState(false);
+  const [isDescExpanded, setIsDescExpanded] = useState(false);
+
   const discountPercentage =
     product.discountPrice && product.discountPrice < product.price
       ? Math.round(
@@ -53,7 +65,6 @@ export default function ProductInfo({
   const handleAddToCart = async () => {
     try {
       setAdding(true);
-      // সাইজ ও কালারসহ প্রডাক্ট অবজেক্ট তৈরি করে পাস করা হচ্ছে
       const productWithSelections = {
         ...product,
         selectedSize,
@@ -82,6 +93,40 @@ export default function ProductInfo({
     }
   };
 
+  // Share and Copy Link handlers
+  const handleShare = async () => {
+    if (navigator.share) {
+      try {
+        await navigator.share({
+          title: product.name,
+          text: product.description,
+          url: window.location.href,
+        });
+      } catch (error) {
+        console.log("Error sharing:", error);
+      }
+    } else {
+      handleCopyLink();
+    }
+  };
+
+  const handleCopyLink = () => {
+    navigator.clipboard.writeText(window.location.href);
+    setCopied(true);
+    setTimeout(() => setCopied(false), 2000);
+  };
+
+  const categoryName: string =
+    typeof product.category === "object" && product.category !== null
+      ? product.category.name
+      : typeof product.category === "string"
+      ? product.category
+      : "General";
+
+  // Specifications slicing for Show More/Less
+  const specsList = product.specifications || [];
+  const displayedSpecs = showAllSpecs ? specsList : specsList.slice(0, 4);
+
   return (
     <div className="space-y-6">
       {/* BADGES */}
@@ -104,26 +149,51 @@ export default function ProductInfo({
           {product.stock > 0 ? <PackageCheck size={14} /> : <AlertCircle size={14} />}
           {product.stock > 0 ? `In Stock (${product.stock} available)` : "Out of Stock"}
         </span>
+
+        {/* Low Stock Warning */}
+        {product.stock > 0 && product.stock <= 5 && (
+          <span className="bg-amber-50 text-amber-700 border border-amber-200 px-3 py-1.5 rounded-full flex items-center gap-1.5 text-xs font-semibold animate-pulse">
+            <AlertCircle size={14} />
+            Only {product.stock} left in stock!
+          </span>
+        )}
       </div>
 
-      {/* TITLE & ACTIONS */}
+      {/* TITLE & ACTIONS (Wishlist, Share, Copy Link) */}
       <div className="flex items-start justify-between gap-4">
-        <h1 className="text-2xl sm:text-3xl lg:text-4xl font-extrabold text-zinc-900 tracking-tight leading-tight">
-          {product.name}
-        </h1>
+        <div>
+          {product.brand && (
+            <p className="text-xs font-bold text-zinc-400 uppercase tracking-wider mb-1">
+              Brand: <span className="text-zinc-800">{product.brand}</span>
+            </p>
+          )}
+          <h1 className="text-2xl sm:text-3xl lg:text-4xl font-extrabold text-zinc-900 tracking-tight leading-tight">
+            {product.name}
+          </h1>
+        </div>
 
         <div className="flex gap-2 shrink-0">
           <button 
-            className="border border-zinc-200 rounded-full p-3 hover:border-black hover:bg-zinc-50 transition cursor-pointer text-zinc-700 shadow-2xs"
+            onClick={() => setIsWishlisted(!isWishlisted)}
+            className={`border rounded-full p-3 transition cursor-pointer shadow-2xs ${isWishlisted ? "bg-rose-50 border-rose-200 text-rose-600" : "border-zinc-200 hover:border-black hover:bg-zinc-50 text-zinc-700"}`}
             aria-label="Wishlist"
           >
-            <Heart size={18} />
+            <Heart size={18} fill={isWishlisted ? "currentColor" : "none"} />
           </button>
           <button 
+            onClick={handleShare}
             className="border border-zinc-200 rounded-full p-3 hover:border-black hover:bg-zinc-50 transition cursor-pointer text-zinc-700 shadow-2xs"
             aria-label="Share"
           >
             <Share2 size={18} />
+          </button>
+          <button 
+            onClick={handleCopyLink}
+            className="border border-zinc-200 rounded-full p-3 hover:border-black hover:bg-zinc-50 transition cursor-pointer text-zinc-700 shadow-2xs relative"
+            aria-label="Copy Product Link"
+            title="Copy Link"
+          >
+            {copied ? <Check size={18} className="text-emerald-600" /> : <Copy size={18} />}
           </button>
         </div>
       </div>
@@ -141,26 +211,39 @@ export default function ProductInfo({
           ))}
         </div>
         <span className="text-xs sm:text-sm font-medium text-zinc-600">
-          <strong className="text-zinc-900">{product.rating || 0}</strong> ({product.numReviews || 0} Reviews)
+          <strong className="text-zinc-900">{product.rating || 0}</strong> ({product.numReviews || 0} Customer Reviews)
         </span>
       </div>
 
-      {/* PRICE */}
-      <div className="flex items-center gap-3 flex-wrap bg-zinc-50 border border-zinc-200/80 p-4 rounded-2xl">
-        <h2 className="text-3xl sm:text-4xl font-black text-zinc-900">
-          {formatPrice(salePrice)}
-        </h2>
+      {/* PRICE SECTION */}
+      <div className="flex flex-col gap-2 bg-zinc-50 border border-zinc-200/80 p-4 rounded-2xl">
+        <div className="flex items-center gap-3 flex-wrap">
+          <h2 className="text-3xl sm:text-4xl font-black text-zinc-900">
+            {formatPrice(salePrice)}
+          </h2>
 
-        {product.discountPrice > 0 && (
-          <div className="flex items-center gap-2">
-            <span className="line-through text-zinc-400 text-lg font-medium">
-              {formatPrice(product.price)}
+          {product.discountPrice > 0 && (
+            <div className="flex items-center gap-2">
+              <span className="line-through text-zinc-400 text-lg font-medium">
+                {formatPrice(product.price)}
+              </span>
+              <span className="bg-rose-100 text-rose-600 text-xs font-bold px-2.5 py-1 rounded-lg">
+                -{discountPercentage}% OFF
+              </span>
+            </div>
+          )}
+        </div>
+
+        {/* You Save & Tax info */}
+        <div className="flex items-center justify-between text-xs text-zinc-500 pt-1 border-t border-zinc-200/60 flex-wrap gap-2">
+          {product.discountPrice > 0 && (
+            <span className="text-emerald-600 font-semibold">
+              You Save: {formatPrice(product.price - salePrice)} ({discountPercentage}%)
             </span>
-            <span className="bg-rose-100 text-rose-600 text-xs font-bold px-2.5 py-1 rounded-lg">
-              -{discountPercentage}% OFF
-            </span>
-          </div>
-        )}
+          )}
+          <span className="text-zinc-500">Tax Included</span>
+          <span className="text-zinc-700 font-medium">EMI Available (Starting from ৳{Math.round(salePrice / 3)}/mo)</span>
+        </div>
       </div>
 
       {/* SIZE SELECTION */}
@@ -269,57 +352,100 @@ export default function ProductInfo({
         </div>
       </div>
 
-      {/* DESCRIPTION */}
-      <div className="bg-white border border-zinc-200/80 rounded-2xl p-5 shadow-2xs space-y-2">
+      {/* DESCRIPTION WITH READ MORE */}
+      <div className="bg-white border border-zinc-200/80 rounded-2xl p-5 shadow-2xs space-y-3">
         <h3 className="font-bold text-base text-zinc-900">Description</h3>
-        <p className="text-zinc-600 text-xs sm:text-sm leading-relaxed">
-          {product.description}
-        </p>
+        <div className={`text-zinc-600 text-xs sm:text-sm leading-relaxed ${!isDescExpanded ? "line-clamp-3" : ""}`}>
+          <p>{product.description}</p>
+        </div>
+        {product.description && product.description.length > 150 && (
+          <button
+            onClick={() => setIsDescExpanded(!isDescExpanded)}
+            className="text-xs font-bold text-black underline cursor-pointer pt-1"
+          >
+            {isDescExpanded ? "Show Less" : "Read More"}
+          </button>
+        )}
       </div>
 
-      {/* SPECIFICATIONS */}
-      {product.specifications && product.specifications.length > 0 && (
+      {/* SPECIFICATIONS WITH TABLE LAYOUT & SHOW MORE/LESS */}
+      {specsList.length > 0 && (
         <div className="bg-white border border-zinc-200/80 rounded-2xl p-5 shadow-2xs space-y-3">
-          <h3 className="font-bold text-base text-zinc-900">Specifications</h3>
-          <div className="divide-y divide-zinc-100">
-            {product.specifications.map((item, index) => (
-              <div key={index} className="flex justify-between py-2 text-xs sm:text-sm">
+          <div className="flex items-center justify-between">
+            <h3 className="font-bold text-base text-zinc-900">Specifications</h3>
+            <span className="text-xs text-zinc-400 font-medium">{specsList.length} items</span>
+          </div>
+          <div className="divide-y divide-zinc-100 overflow-hidden">
+            {displayedSpecs.map((item, index) => (
+              <div key={index} className="flex justify-between py-2.5 text-xs sm:text-sm">
                 <span className="text-zinc-500 font-medium">{item.key}</span>
-                <span className="font-semibold text-zinc-800">{item.value}</span>
+                <span className="font-semibold text-zinc-800 text-right">{item.value}</span>
               </div>
             ))}
           </div>
+          {specsList.length > 4 && (
+            <button
+              onClick={() => setShowAllSpecs(!showAllSpecs)}
+              className="w-full mt-2 py-2 border border-zinc-200 rounded-xl text-xs font-bold text-zinc-700 hover:bg-zinc-50 transition flex items-center justify-center gap-1.5 cursor-pointer"
+            >
+              {showAllSpecs ? (
+                <>Show Less <ChevronUp size={14} /></>
+              ) : (
+                <>Show More Specifications <ChevronDown size={14} /></>
+              )}
+            </button>
+          )}
         </div>
       )}
 
       {/* PRODUCT META INFO */}
       <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
         <Info title="Stock Status" value={`${product.stock} units`} />
-        <Info
-          title="Category"
-          value={
-            typeof product.category === "object" && product.category !== null
-              ? product.category.name
-              : "General"
-          }
-        />
-        {product.warrantyPeriod && (
-          <Info title="Warranty" value={product.warrantyPeriod} />
-        )}
+        <Info title="Category" value={categoryName} />
+        {product.sku && <Info title="SKU" value={product.sku} />}
+        {product.brand && <Info title="Brand" value={product.brand} />}
+        {('weight' in product && (product as any).weight) && <Info title="Weight" value={`${(product as any).weight} kg`} />}
+        {product.warrantyPeriod && <Info title="Warranty" value={product.warrantyPeriod} />}
       </div>
 
-      {/* SERVICE & GUARANTEES */}
+      {/* TRUST & SERVICE SECTION */}
       <div className="bg-zinc-50 border border-zinc-200/80 rounded-2xl p-5 space-y-3 text-xs sm:text-sm font-medium text-zinc-700">
-        <div className="flex items-center gap-3">
-          <Truck size={18} className="text-zinc-900" />
-          <span>Fast Delivery across the country</span>
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+          <div className="flex items-center gap-3">
+            <Truck size={18} className="text-zinc-900 shrink-0" />
+            <div>
+              <p className="font-bold text-zinc-900">Estimated Delivery</p>
+              <p className="text-xs text-zinc-500">3-5 Business Days (Shipping: ৳60)</p>
+            </div>
+          </div>
+
+          <div className="flex items-center gap-3">
+            <RefreshCw size={18} className="text-zinc-900 shrink-0" />
+            <div>
+              <p className="font-bold text-zinc-900">Return & Replacement</p>
+              <p className="text-xs text-zinc-500">7 Days Easy Return Policy</p>
+            </div>
+          </div>
+
+          <div className="flex items-center gap-3">
+            <ShieldCheck size={18} className="text-zinc-900 shrink-0" />
+            <div>
+              <p className="font-bold text-zinc-900">Secure Checkout</p>
+              <p className="text-xs text-zinc-500">Cash on Delivery Available</p>
+            </div>
+          </div>
+
+          <div className="flex items-center gap-3">
+            <Award size={18} className="text-zinc-900 shrink-0" />
+            <div>
+              <p className="font-bold text-zinc-900">Original Product</p>
+              <p className="text-xs text-zinc-500">100% Authentic Guarantee</p>
+            </div>
+          </div>
         </div>
-        <div className="flex items-center gap-3">
-          <ShieldCheck size={18} className="text-zinc-900" />
-          <span>100% Secure Payment & Buyer Protection</span>
-        </div>
+
         {product.freeShipping && (
-          <div className="flex items-center gap-3 text-emerald-600 font-semibold">
+          <div className="flex items-center gap-2 pt-2 border-t border-zinc-200/60 text-emerald-600 font-semibold text-xs">
             <span>🚚 Free Shipping Available on this item</span>
           </div>
         )}
@@ -328,7 +454,7 @@ export default function ProductInfo({
   );
 }
 
-function Info({ title, value }: { title: string; value: string }) {
+function Info({ title, value }: { title: string; value: string | React.ReactNode }) {
   return (
     <div className="bg-white border border-zinc-200/80 rounded-xl p-3.5 shadow-2xs">
       <p className="text-zinc-400 text-[11px] font-medium uppercase tracking-wider">{title}</p>
