@@ -1,435 +1,204 @@
 "use client";
 
-
 import {
-  useEffect
+  useEffect,
+  useState
 } from "react";
-
 
 import {
   useProductFormContext
 } from "@/context/ProductFormContext";
 
-
+import { getCategories } from "@/services/category.service";
+import { Category } from "@/types/category";
 import generateSlug from "@/utils/generateSlug";
-
 import generateSKU from "@/utils/generateSKU";
-
-
 import FormInput from "../shared/FormInput";
-
-
-
-
-
-
-
-export default function BasicInfoStep(){
-
-
-
-const {
-
-form,
-
-updateField
-
-}=useProductFormContext();
-
-
-
-
-
-
-
-
-useEffect(()=>{
-
-
-if(
-
-form.name && !form.slug
-
-){
-
-
-updateField(
-
-"slug",
-
-generateSlug(form.name)
-
-);
-
-
-}
-
-
-
-},[
-
-form.name,
-
-form.slug
-
-]);
-
-
-
-
-
-
-
-
-
-const handleGenerateSKU=()=>{
-
-
-const sku = generateSKU("PRD");
-
-
-updateField(
-
-"sku",
-
-sku
-
-);
-
-
-};
-
-
-
-
-
-
-
-
-
-return (
-
-
-
-<div className="space-y-6">
-
-
-
-
-
-<div>
-
-<h2 className="text-xl font-semibold">
-
-Basic Information
-
-</h2>
-
-
-<p className="text-sm text-muted-foreground">
-
-Add product basic details.
-
-</p>
-
-
-</div>
-
-
-
-
-
-
-
-
-
-<FormInput
-
-
-label="Product Name"
-
-
-placeholder="Enter product name"
-
-
-value={form.name}
-
-
-onChange={(value)=>
-
-updateField(
-
-"name",
-
-value
-
-)
-
-}
-
-
-/>
-
-
-
-
-
-
-
-
-
-<FormInput
-
-
-label="Brand"
-
-
-placeholder="Enter brand name"
-
-
-value={form.brand}
-
-
-onChange={(value)=>
-
-updateField(
-
-"brand",
-
-value
-
-)
-
-}
-
-
-/>
-
-
-
-
-
-
-
-
-
-<FormInput
-
-
-label="Description"
-
-
-placeholder="Enter product description"
-
-
-value={form.description}
-
-
-onChange={(value)=>
-
-updateField(
-
-"description",
-
-value
-
-)
-
-}
-
-
-/>
-
-
-
-
-
-
-
-
-
-<div className="flex gap-3 items-end">
-
-
-<div className="flex-1">
-
-
-<FormInput
-
-
-label="SKU"
-
-
-placeholder="Generate or enter SKU"
-
-
-value={form.sku}
-
-
-onChange={(value)=>
-
-updateField(
-
-"sku",
-
-value
-
-)
-
-}
-
-
-/>
-
-
-</div>
-
-
-
-
-
-<button
-
-type="button"
-
-onClick={handleGenerateSKU}
-
-className="
-px-4
-py-2
-rounded-md
-bg-black
-text-white
-"
-
->
-
-Generate SKU
-
-</button>
-
-
-
-</div>
-
-
-
-
-
-
-
-
-
-<FormInput
-
-
-label="Slug"
-
-
-placeholder="product-slug"
-
-
-value={form.slug}
-
-
-onChange={(value)=>
-
-updateField(
-
-"slug",
-
-value
-
-)
-
-}
-
-
-/>
-
-
-
-
-
-
-
-
-
-<FormInput
-
-
-label="Category"
-
-
-placeholder="Category"
-
-
-value={form.category}
-
-
-onChange={(value)=>
-
-updateField(
-
-"category",
-
-value
-
-)
-
-}
-
-
-/>
-
-
-
-
-
-
-
-
-
-<FormInput
-
-
-label="Sub Category"
-
-
-placeholder="Sub Category"
-
-
-value={form.subCategory}
-
-
-onChange={(value)=>
-
-updateField(
-
-"subCategory",
-
-value
-
-)
-
-}
-
-
-/>
-
-
-
-
-
-
-
-
-</div>
-
-
-
-);
-
-
-
+import FormSelect from "../shared/FormSelect";
+import FormTextarea from "../shared/FormTextarea";
+import SectionCard from "../shared/SectionCard";
+import { Sparkles } from "lucide-react";
+
+export default function BasicInfoStep() {
+  const {
+    form,
+    updateField
+  } = useProductFormContext();
+
+  const [categories, setCategories] = useState<Category[]>([]);
+
+  useEffect(() => {
+    const loadCategories = async () => {
+      try {
+        const data = await getCategories();
+        setCategories(data || []);
+      } catch (error) {
+        console.error("Failed to load categories:", error);
+      }
+    };
+
+    loadCategories();
+  }, []);
+
+  useEffect(() => {
+    if (
+      form.name && !form.slug
+    ) {
+      updateField(
+        "slug",
+        generateSlug(form.name)
+      );
+    }
+  }, [
+    form.name,
+    form.slug,
+    updateField
+  ]);
+
+  const handleGenerateSKU = () => {
+    const sku = generateSKU("PRD");
+    updateField(
+      "sku",
+      sku
+    );
+  };
+
+  const parentCategories = categories.filter((category) => !category.parent);
+  const subCategories = categories.filter((category) => {
+    const parentId = typeof category.parent === "string" ? category.parent : category.parent?._id;
+    return parentId === form.category;
+  });
+
+  return (
+    <div className="space-y-6">
+      <SectionCard
+        title="Basic Information"
+        description="Provide the core details of your product, including name, description, and categorization."
+      >
+        <div className="space-y-5">
+          <FormInput
+            label="Product Name"
+            placeholder="e.g. Premium Cotton Oversized Hoodie"
+            value={form.name || ""}
+            onChange={(value) =>
+              updateField(
+                "name",
+                value
+              )
+            }
+          />
+
+          <FormInput
+            label="Brand"
+            placeholder="e.g. Noptrix"
+            value={form.brand || ""}
+            onChange={(value) =>
+              updateField(
+                "brand",
+                value
+              )
+            }
+          />
+
+          <FormTextarea
+            label="Description"
+            placeholder="Provide a detailed description of the product features, fabric, and usage..."
+            value={form.description || ""}
+            onChange={(value) =>
+              updateField(
+                "description",
+                value
+              )
+            }
+          />
+
+          <div className="grid grid-cols-1 md:grid-cols-12 gap-4 items-end">
+            <div className="md:col-span-8">
+              <FormInput
+                label="SKU (Stock Keeping Unit)"
+                placeholder="e.g. PRD-XXXXX"
+                value={form.sku || ""}
+                onChange={(value) =>
+                  updateField(
+                    "sku",
+                    value
+                  )
+                }
+              />
+            </div>
+
+            <div className="md:col-span-4 pb-0.5">
+              <button
+                type="button"
+                onClick={handleGenerateSKU}
+                className="
+                  w-full
+                  px-4
+                  py-2.5
+                  rounded-lg
+                  bg-black
+                  text-white
+                  text-sm
+                  font-medium
+                  flex
+                  items-center
+                  justify-center
+                  gap-2
+                  hover:bg-gray-800
+                  transition-colors
+                "
+              >
+                <Sparkles size={16} />
+                Generate SKU
+              </button>
+            </div>
+          </div>
+
+          <FormInput
+            label="URL Slug"
+            placeholder="e.g. premium-cotton-oversized-hoodie"
+            value={form.slug || ""}
+            onChange={(value) =>
+              updateField(
+                "slug",
+                value
+              )
+            }
+          />
+
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            <FormSelect
+              label="Category"
+              value={form.category || ""}
+              placeholder="Select a category"
+              options={parentCategories.map((category) => ({
+                label: category.name,
+                value: category._id
+              }))}
+              onChange={(value) => {
+                updateField("category", value);
+                updateField("subCategory", "");
+              }}
+            />
+
+            <FormSelect
+              label="Sub Category"
+              value={form.subCategory || ""}
+              placeholder={form.category ? "Select a sub category" : "Select a parent category first"}
+              options={subCategories.map((category) => ({
+                label: category.name,
+                value: category._id
+              }))}
+              onChange={(value) =>
+                updateField(
+                  "subCategory",
+                  value
+                )
+              }
+            />
+          </div>
+        </div>
+      </SectionCard>
+    </div>
+  );
 }

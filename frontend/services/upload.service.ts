@@ -43,7 +43,7 @@ headers:{
 
 
 
-return res.data.url;
+return res.data?.url || res.data?.message || "";
 
 
 };

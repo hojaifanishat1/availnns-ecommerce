@@ -2,6 +2,8 @@ import LoginHero from "@/components/auth/LoginHero";
 import TrustStats from "@/components/auth/TrustStats";
 import ResetPasswordForm from "@/components/auth/ResetPasswordForm";
 
+export const dynamic = "force-dynamic";
+
 export default async function ResetPasswordPage({
   params,
 }: {

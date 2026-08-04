@@ -34,6 +34,25 @@ export const createBanner = async (bannerData: any, token: string) => {
   return await res.json();
 };
 
+export const updateBanner = async (id: string, bannerData: any, token: string) => {
+  const isFormData = bannerData instanceof FormData;
+
+  const headers: Record<string, string> = {
+    Authorization: `Bearer ` + token,
+  };
+
+  if (!isFormData) {
+    headers["Content-Type"] = "application/json";
+  }
+
+  const res = await fetch(`${API_URL}/banners/${id}`, {
+    method: "PUT",
+    headers,
+    body: isFormData ? bannerData : JSON.stringify(bannerData),
+  });
+  return await res.json();
+};
+
 export const removeBanner = async (id: string, token: string) => {
   const res = await fetch(`${API_URL}/banners/${id}`, {
     method: "DELETE",

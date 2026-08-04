@@ -1,171 +1,66 @@
-import {
-  ProductShipping
-} from "./shipping";
+import { ProductShipping } from "./shipping";
+import { ProductVariant } from "./variant";
+import { ProductMedia } from "./media";
+import { ProductSeo } from "./seo";
+import { ProductSpecification } from "./specification";
 
-
-import {
-  ProductVariant
-} from "./variant";
-
-
-import {
-  ProductMedia
-} from "./media";
-
-
-import {
-  ProductSeo
-} from "./seo";
-
-
-import {
-  ProductSpecification
-} from "./specification";
-
-
-export type ProductStatus =
-  | "draft"
-  | "active"
-  | "inactive"
-  | "archived";
-
-
+export type ProductStatus = 'draft' | 'active' | 'inactive' | 'archived';
 
 export interface ProductPricing {
-
   price: number;
-
-
   discountPrice?: number;
-
-
-  currency?: string;
-
-
-  discountStartDate?: string;
-
-
-  discountEndDate?: string;
-
+  currency?: string;          // যেমন: "SAR", "BDT", "USD"
+  discountStartDate?: string | Date;
+  discountEndDate?: string | Date;
 }
-
-
 
 export interface ProductInventory {
-
   stock: number;
-
-
   lowStockThreshold: number;
-
-
   trackInventory: boolean;
-
-
   allowBackOrder: boolean;
-
 }
-
-
 
 export interface ProductAttribute {
-
-  name: string;
-
-
-  value: string;
-
+  name: string;   // যেমন: "Color", "Size"
+  value: string;  // যেমন: "Midnight Black", "XL"
 }
-
-
 
 export interface ProductFlags {
-
   isFeatured: boolean;
-
-
   isBestSeller: boolean;
-
-
   isNewArrival: boolean;
-
-
   isDigital: boolean;
-
 }
 
-
-
 export interface Product {
-
   _id?: string;
-
-
   name: string;
-
-
+  slug: string;                  // URL ফ্রেন্ডলি নামের জন্য অত্যন্ত জরুরি
   description: string;
-
-
+  shortDescription?: string;     // প্রোডাক্ট কার্ড বা প্রিভিউয়ের জন্য
   brand?: string;
-
-
   sku?: string;
-
-
-  category: string;
-
-
+  category: string;              // Category ID or Name
   subCategory?: string;
-
-
   tags: string[];
 
-
-
-  images: ProductMedia[];
-
-
-
+  media: ProductMedia[];         // 'images' এর বদলে 'media' রাখা ভালো যেহেতু ভিডিও থাকতে পারে
   variants: ProductVariant[];
 
-
-
   pricing: ProductPricing;
-
-
-
   inventory: ProductInventory;
-
-
-
   shipping: ProductShipping;
-
-
-
   seo: ProductSeo;
-
-
-
   specifications: ProductSpecification[];
-
-
-
   attributes: ProductAttribute[];
-
-
-
   flags: ProductFlags;
-
-
-
+  
   status: ProductStatus;
 
+  ratingsAverage?: number;       // রিভিউ ও রেটিংসের জন্য
+  ratingsQuantity?: number;
 
-
-  createdAt?: string;
-
-
-  updatedAt?: string;
-
+  createdAt?: string | Date;
+  updatedAt?: string | Date;
 }

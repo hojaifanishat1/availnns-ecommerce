@@ -2,317 +2,153 @@ import {
   ProductForm,
 } from "@/types/productForm";
 
-
-
-
-
 export const DEFAULT_PRODUCT_FORM: ProductForm = {
-
-
-
   // =========================
   // Basic Information
   // =========================
 
-  name:"",
+  name: "",
 
-  description:"",
+  description: "",
 
-  brand:"",
+  brand: "",
 
-  sku:"",
+  sku: "",
 
-  slug:"",
+  slug: "",
 
-  category:"",
+  category: "",
 
-  subCategory:"",
-
+  subCategory: "",
 
   // Dynamic category fields
-  // Example:
-  // Electronics:
-  // {ram:"8GB", storage:"256GB"}
-  //
-  // Fashion:
-  // {fabric:"Cotton"}
-
-  categoryFields:{},
-
-
-
-
-
-
+  categoryFields: {},
 
   // =========================
   // Pricing
   // =========================
 
-  pricing:{
+  pricing: {
+    price: 0,
 
+    discountPrice: 0,
 
-    price:0,
+    currency: "SAR",
 
+    discountStartDate: "",
 
-    discountPrice:0,
-
-
-    currency:"SAR",
-
-
-    discountStartDate:"",
-
-
-    discountEndDate:"",
-
-
+    discountEndDate: "",
   },
-
-
-
-
-
-
-
 
   // =========================
   // Inventory
   // =========================
 
-  stock:0,
+  stock: 0,
 
-
-  lowStockThreshold:5,
-
-
-
-
-
-
-
-
+  lowStockThreshold: 5,
 
   // =========================
   // Shipping
   // =========================
 
-  shipping:{
+  shipping: {
+    weight: {
+      value: 0,
 
-
-
-    weight:{
-
-
-      value:0,
-
-
-      unit:"kg",
-
-
+      unit: "kg",
     },
 
+    dimensions: {
+      length: 0,
 
+      width: 0,
 
-    dimensions:{
-
-
-      length:0,
-
-
-      width:0,
-
-
-      height:0,
-
-
+      height: 0,
     },
 
-
-
-    freeShipping:false,
-
-
+    freeShipping: false,
   },
 
-
-
-
-
-
-
-
-  shippingClass:"standard",
-
-
-
-
-
-
+  shippingClass: "standard",
 
   // =========================
   // SEO
   // =========================
 
-  seo:{
+  seo: {
+    metaTitle: "",
 
+    metaDescription: "",
 
-    metaTitle:"",
+    slug: "",
 
-
-    metaDescription:"",
-
-
-    slug:"",
-
-
-    keywords:[],
-
-
+    keywords: [],
   },
-
-
-
-
-
-
-
-
 
   // =========================
   // Media
   // =========================
 
-  images:[],
-
-
-
-
-
-
-
-
+  images: [],
 
   // =========================
   // Variants
   // =========================
 
-  variants:[],
-
-
-
-
-
-
-
-
+  variants: [],
 
   // =========================
   // Specifications
   // =========================
 
-  specifications:[],
-
-
-
-
-
-
-
-
+  specifications: [],
 
   // =========================
   // Attributes
   // =========================
 
-  attributes:[],
-
-
-
-
-
-
-
-
+  attributes: [],
 
   // =========================
   // Tags
   // =========================
 
-  tags:[],
-
-
-
-
-
-
-
-
+  tags: [],
 
   // =========================
   // Status
   // =========================
 
-  status:"draft",
-
-
-
-
-
-
+  status: "draft",
 
   // =========================
   // Flags
   // =========================
 
-  flags:{
+  flags: {
+    isFeatured: false,
 
+    isBestSeller: false,
 
-    isFeatured:false,
+    isNewArrival: false,
 
-
-    isBestSeller:false,
-
-
-    isNewArrival:false,
-
-
-    isDigital:false,
-
-
+    isDigital: false,
   },
-
-
-
-
-
-
-
-
 
   // =========================
   // Draft
   // =========================
 
-  isDraft:true,
-
-
-
-
-
-
-
-
+  isDraft: true,
 
   // =========================
   // Wizard
   // =========================
 
-  completedSteps:[],
+  completedSteps: [],
 
-
-  currentStep:1,
-
-
-
+  currentStep: 1,
 };
+
+export default DEFAULT_PRODUCT_FORM;

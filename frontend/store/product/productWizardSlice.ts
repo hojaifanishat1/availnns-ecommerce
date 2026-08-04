@@ -1,277 +1,70 @@
-import {
-
-createSlice,
-
-PayloadAction
-
-} from "@reduxjs/toolkit";
-
-
-
-
+import { createSlice, PayloadAction } from "@reduxjs/toolkit";
 
 interface WizardState {
-
-
-currentStep:number;
-
-
-completedSteps:number[];
-
-
-totalSteps:number;
-
-
+  currentStep: number;
+  completedSteps: number[];
+  totalSteps: number;
 }
 
-
-
-
-
-
-
-const initialState:WizardState={
-
-
-currentStep:1,
-
-
-completedSteps:[],
-
-
-totalSteps:10
-
-
+const initialState: WizardState = {
+  currentStep: 1,
+  completedSteps: [],
+  totalSteps: 10,
 };
 
-
-
-
-
-
-
-
 const productWizardSlice = createSlice({
-
-
-
-name:"productWizard",
-
-
-
-initialState,
-
-
-
-reducers:{
-
-
-
-
-
-
-
-nextStep:(state)=>{
-
-
-
-if(
-
-!state.completedSteps.includes(
-
-state.currentStep
-
-)
-
-){
-
-
-state.completedSteps.push(
-
-state.currentStep
-
-);
-
-
-}
-
-
-
-
-
-
-if(
-
-state.currentStep < state.totalSteps
-
-){
-
-
-state.currentStep +=1;
-
-
-}
-
-
-
-},
-
-
-
-
-
-
-
-previousStep:(state)=>{
-
-
-
-state.currentStep =
-
-Math.max(
-
-1,
-
-state.currentStep-1
-
-);
-
-
-
-},
-
-
-
-
-
-
-
-goToStep:(
-
-state,
-
-action:PayloadAction<number>
-
-)=>{
-
-
-
-if(
-
-action.payload >=1 &&
-
-action.payload <= state.totalSteps
-
-){
-
-
-
-state.currentStep =
-
-action.payload;
-
-
-
-}
-
-
-
-},
-
-
-
-
-
-
-
-completeStep:(
-
-state,
-
-action:PayloadAction<number>
-
-)=>{
-
-
-
-if(
-
-!state.completedSteps.includes(
-
-action.payload
-
-)
-
-){
-
-
-
-state.completedSteps.push(
-
-action.payload
-
-);
-
-
-
-}
-
-
-
-},
-
-
-
-
-
-
-
-resetWizard:(state)=>{
-
-
-
-state.currentStep = 1;
-
-
-state.completedSteps = [];
-
-
-}
-
-
-
-}
-
-
-
+  name: "productWizard",
+  initialState,
+  reducers: {
+    nextStep: (state) => {
+      // বর্তমান স্টেপটি কমপ্লিটেড লিস্টে না থাকলে যোগ করা
+      if (!state.completedSteps.includes(state.currentStep)) {
+        state.completedSteps.push(state.currentStep);
+      }
+
+      // টোটাল স্টেপের বেশি যেন না যায়
+      if (state.currentStep < state.totalSteps) {
+        state.currentStep += 1;
+      }
+    },
+
+    previousStep: (state) => {
+      // ১ এর নিচে যেন না নামে
+      state.currentStep = Math.max(1, state.currentStep - 1);
+    },
+
+    goToStep: (state, action: PayloadAction<number>) => {
+      const targetStep = action.payload;
+      if (targetStep >= 1 && targetStep <= state.totalSteps) {
+        state.currentStep = targetStep;
+      }
+    },
+
+    completeStep: (state, action: PayloadAction<number>) => {
+      const step = action.payload;
+      if (step >= 1 && step <= state.totalSteps && !state.completedSteps.includes(step)) {
+        state.completedSteps.push(step);
+      }
+    },
+
+    setTotalSteps: (state, action: PayloadAction<number>) => {
+      state.totalSteps = action.payload;
+    },
+
+    resetWizard: (state) => {
+      state.currentStep = 1;
+      state.completedSteps = [];
+    },
+  },
 });
 
-
-
-
-
-
-
-
-
 export const {
-
-nextStep,
-
-previousStep,
-
-goToStep,
-
-completeStep,
-
-resetWizard
-
-}=productWizardSlice.actions;
-
-
-
-
-
-
+  nextStep,
+  previousStep,
+  goToStep,
+  completeStep,
+  setTotalSteps,
+  resetWizard,
+} = productWizardSlice.actions;
 
 export default productWizardSlice.reducer;

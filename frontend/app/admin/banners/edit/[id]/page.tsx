@@ -5,12 +5,15 @@ import { useRouter, useParams } from "next/navigation";
 import { getAdminBanners, updateBanner } from "@/services/banner.service";
 import { Loader2, ArrowLeft } from "lucide-react";
 import Link from "next/link";
-import Uploader from "@/components/admin/Uploader"; // Uploader কম্পোনেন্ট ইমপোর্ট করা হলো
+import ImageUploader from "@/components/admin/products/shared/ImageUploader";
+
+export const dynamic = "force-dynamic";
 
 export default function EditBannerPage() {
   const router = useRouter();
-  const params = useParams();
-  const id = params?.id as string;
+  const params = useParams<{ id?: string | string[] }>();
+  const rawId = params?.id;
+  const id = typeof rawId === "string" ? rawId : Array.isArray(rawId) ? rawId[0] : undefined;
 
   const [loading, setLoading] = useState(false);
   const [fetching, setFetching] = useState(true);
@@ -137,9 +140,8 @@ export default function EditBannerPage() {
         {/* Banner Image Uploader */}
         <div>
           <label className="block text-sm font-medium text-gray-700 mb-1">Banner Image *</label>
-          <Uploader
-            value={formData.image}
-            onChange={(url: string) => setFormData({ ...formData, image: url })}
+          <ImageUploader
+            onUpload={(image) => setFormData({ ...formData, image: image.url })}
           />
         </div>
 

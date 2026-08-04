@@ -7,9 +7,12 @@ import { ArrowLeft, CheckCircle2, Clock, Package, Truck } from "lucide-react";
 import { getMyOrders } from "@/services/order.service";
 import { useCurrency } from "@/context/CurrencyContext";
 
+export const dynamic = "force-dynamic";
+
 export default function TrackOrderPage() {
-  const params = useParams();
-  const id = params?.id as string;
+  const params = useParams<{ id?: string | string[] }>();
+  const rawId = params?.id;
+  const id = typeof rawId === "string" ? rawId : Array.isArray(rawId) ? rawId[0] : undefined;
   const { formatPrice } = useCurrency();
 
   const [order, setOrder] = useState<any>(null);

@@ -2,35 +2,13 @@ import {
   ProductAttribute,
   ProductFlags,
   ProductPricing,
+  ProductStatus,
 } from "./product";
-
-
-import {
-  ProductSeo,
-} from "./seo";
-
-
-import {
-  ProductSpecification,
-} from "./specification";
-
-
-import {
-  ProductMedia,
-} from "./media";
-
-
-import {
-  ProductShipping,
-} from "./shipping";
-
-
-import {
-  ProductVariant,
-} from "./variant";
-
-
-
+import { ProductSeo } from "./seo";
+import { ProductSpecification } from "./specification";
+import { ProductMedia } from "./media";
+import { ProductShipping } from "./shipping";
+import { ProductVariant } from "./variant";
 
 // =========================
 // Dynamic Category Fields
@@ -43,311 +21,76 @@ export type CategoryFieldValue =
   | string[]
   | null;
 
-
-
 export interface ProductCategoryFields {
-
-  [key:string]:CategoryFieldValue;
-
+  [key: string]: CategoryFieldValue;
 }
 
+export type ShippingClassType = "standard" | "express" | "free";
 
-
-
-
+export type FormStatusType = "draft" | "published" | "archived";
 
 // =========================
-// Product Form
+// Product Form Data Structure
 // =========================
 
 export interface ProductForm {
-
-
-
-  // =========================
   // Basic Information
-  // =========================
+  name: string;
+  description: string;
+  shortDescription?: string;
+  brand: string;
+  sku: string;
+  slug: string;
+  category: string;
+  subCategory?: string;
 
+  // Dynamic fields (e.g., Electronics: { ram: "8GB" }, Fashion: { fabric: "Cotton" })
+  categoryFields: ProductCategoryFields;
 
-  name:string;
+  // Pricing & Inventory
+  pricing: ProductPricing;
+  stock: number;
+  lowStockThreshold: number;
 
-
-  description:string;
-
-
-  brand:string;
-
-
-  sku:string;
-
-
-  slug:string;
-
-
-  category:string;
-
-
-  subCategory:string;
-
-
-
-  // Dynamic fields
-  // Example:
-  // Electronics:
-  // {ram:"8GB", storage:"256GB"}
-  //
-  // Fashion:
-  // {fabric:"Cotton"}
-
-  categoryFields:ProductCategoryFields;
-
-
-
-
-
-
-  // =========================
-  // Pricing
-  // =========================
-
-
-  pricing:ProductPricing;
-
-
-
-
-
-
-
-  // =========================
-  // Inventory
-  // =========================
-
-
-  stock:number;
-
-
-  lowStockThreshold:number;
-
-
-
-
-
-
-
-  // =========================
   // Shipping
-  // =========================
-
-
-  shipping:ProductShipping;
-
-
-
-  shippingClass:
-    | "standard"
-    | "express"
-    | "free";
-
-
-
-
-
-
-
-  // =========================
-  // SEO
-  // =========================
-
-
-  seo:ProductSeo;
-
-
-
-
-
-
-
-  // =========================
-  // Media
-  // =========================
-
-
-  images:ProductMedia[];
-
-
-
-
-
-
-
-  // =========================
-  // Variants
-  // =========================
-
-
-  variants:ProductVariant[];
-
-
-
-
-
-
-
-  // =========================
-  // Specifications
-  // =========================
-
-
-  specifications:ProductSpecification[];
-
-
-
-
-
-
-
-  // =========================
-  // Attributes
-  // =========================
-
-
-  attributes:ProductAttribute[];
-
-
-
-
-
-
-
-  // =========================
-  // Tags
-  // =========================
-
-
-  tags:string[];
-
-
-
-
-
-
-
-  // =========================
-  // Status
-  // =========================
-
-
-  status:
-
-  | "draft"
-
-  | "published"
-
-  | "archived";
-
-
-
-
-
-
-
-  // =========================
-  // Flags
-  // =========================
-
-
-  flags:ProductFlags;
-
-
-
-
-
-
-
-  // =========================
-  // Draft
-  // =========================
-
-
-  isDraft:boolean;
-
-
-
-
-
-
-
-  // =========================
-  // Wizard
-  // =========================
-
-
-  completedSteps:number[];
-
-
-  currentStep:number;
-
-
-
+  shipping: ProductShipping;
+  shippingClass: ShippingClassType;
+
+  // SEO & Marketing
+  seo: ProductSeo;
+
+  // Media & Variants
+  images: ProductMedia[];
+  variants: ProductVariant[];
+
+  // Specs & Attributes
+  specifications: ProductSpecification[];
+  attributes: ProductAttribute[];
+  tags: string[];
+
+  // Status & Flags
+  status: FormStatusType;
+  flags: ProductFlags;
+  isDraft: boolean;
+
+  // Multi-Step Wizard Control
+  completedSteps: number[];
+  currentStep: number;
 }
 
-
-
-
-
-
-
-
 // =========================
-// Form Errors
+// Form Errors & State Management
 // =========================
 
 export interface ProductFormErrors {
-
-
-  [key:string]:string;
-
-
+  [key: string]: string | undefined;
 }
 
-
-
-
-
-
-
-
-// =========================
-// Form State
-// =========================
-
 export interface ProductFormState {
-
-
-
-  data:ProductForm;
-
-
-
-  errors:ProductFormErrors;
-
-
-
-  loading:boolean;
-
-
-
-  saving:boolean;
-
-
-
-  autoSaving:boolean;
-
-
-
-  dirty:boolean;
-
-
-
+  data: ProductForm;
+  errors: ProductFormErrors;
+  loading: boolean;
+  saving: boolean;
+  autoSaving: boolean;
+  dirty: boolean;
 }

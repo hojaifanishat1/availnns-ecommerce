@@ -23,6 +23,27 @@ const parseJSON = (value: any) => {
   return value;
 };
 
+const uploadImageFiles = async (files: Express.Multer.File[]) => {
+  const uploadedImages: { url: string; public_id: string }[] = [];
+
+  for (const file of files) {
+    const result: any = await new Promise((resolve, reject) => {
+      const uploadStream = cloudinary.uploader.upload_stream(
+        { folder: "products" },
+        (error, result) => {
+          if (error) reject(error);
+          else resolve(result);
+        }
+      );
+      streamifier.createReadStream(file.buffer).pipe(uploadStream);
+    });
+
+    uploadedImages.push({ url: result.secure_url, public_id: result.public_id });
+  }
+
+  return uploadedImages;
+};
+
 // ===============================
 // CREATE PRODUCT
 // ===============================
@@ -35,25 +56,24 @@ export const createProduct = async (req: Request, res: Response): Promise<void> 
     }
 
     const uploadedFiles = Array.isArray(req.files) ? (req.files as Express.Multer.File[]) : [];
-    const images: { url: string; public_id: string }[] = [];
+    const parsedImages = parseJSON(req.body.images);
+    const normalizedImages = Array.isArray(parsedImages)
+      ? parsedImages
+          .map((image: any) => {
+            if (typeof image === "string") return { url: image, public_id: "" };
+            if (image?.url) return { url: image.url, public_id: image.public_id || image.publicId || "" };
+            return null;
+          })
+          .filter(Boolean)
+      : [];
 
-    for (const file of uploadedFiles) {
-      const result: any = await new Promise((resolve, reject) => {
-        const uploadStream = cloudinary.uploader.upload_stream(
-          { folder: "products" },
-          (error, result) => {
-            if (error) reject(error);
-            else resolve(result);
-          }
-        );
-        streamifier.createReadStream(file.buffer).pipe(uploadStream);
-      });
-
-      images.push({ url: result.secure_url, public_id: result.public_id });
-    }
+    const images = uploadedFiles.length
+      ? await uploadImageFiles(uploadedFiles)
+      : normalizedImages;
 
     const productData: any = {
       ...req.body,
+      category: req.body.subCategory || req.body.category || "",
       slug,
       images,
       isPublished: true,
@@ -177,29 +197,28 @@ export const updateProduct = async (req: Request, res: Response): Promise<void> 
       return;
     }
 
-    const data: any = { ...req.body };
+    const data: any = { ...req.body, category: req.body.subCategory || req.body.category || req.body.category || "" };
 
     if (req.body.oldImages) {
       data.images = JSON.parse(req.body.oldImages);
     }
 
     const files = req.files as Express.Multer.File[];
+    const parsedImages = parseJSON(req.body.images);
+    const normalizedImages = Array.isArray(parsedImages)
+      ? parsedImages
+          .map((image: any) => {
+            if (typeof image === "string") return { url: image, public_id: "" };
+            if (image?.url) return { url: image.url, public_id: image.public_id || image.publicId || "" };
+            return null;
+          })
+          .filter(Boolean)
+      : [];
+
     if (files && files.length) {
-      const newImages: any[] = [];
-      for (const file of files) {
-        const result: any = await new Promise((resolve, reject) => {
-          const uploadStream = cloudinary.uploader.upload_stream(
-            { folder: "products" },
-            (error, result) => {
-              if (error) reject(error);
-              else resolve(result);
-            }
-          );
-          streamifier.createReadStream(file.buffer).pipe(uploadStream);
-        });
-        newImages.push({ url: result.secure_url, public_id: result.public_id });
-      }
-      data.images = [...(data.images || []), ...newImages];
+      data.images = [...(data.images || []), ...(await uploadImageFiles(files))];
+    } else if (normalizedImages.length) {
+      data.images = normalizedImages;
     }
 
     // FIX ARRAYS

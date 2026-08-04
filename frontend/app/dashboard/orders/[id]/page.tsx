@@ -34,10 +34,13 @@ import {
   useCurrency
 } from "@/context/CurrencyContext";
 
+export const dynamic = "force-dynamic";
+
 export default function OrderDetailsPage(){
-  const params = useParams();
+  const params = useParams<{ id?: string | string[] }>();
   const router = useRouter();
-  const id = params.id as string;
+  const rawId = params?.id;
+  const id = typeof rawId === "string" ? rawId : Array.isArray(rawId) ? rawId[0] : undefined;
   const { formatPrice } = useCurrency();
 
   const [order, setOrder] = useState<any>(null);

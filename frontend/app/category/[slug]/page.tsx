@@ -6,6 +6,8 @@ import ProductGrid from "@/components/product/ProductGrid";
 import { getProducts } from "@/services/product.service";
 import { getCategoryTree } from "@/services/category.service";
 
+export const dynamic = "force-dynamic";
+
 type Props = {
   params: Promise<{
     slug: string;

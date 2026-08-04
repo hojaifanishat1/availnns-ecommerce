@@ -1,263 +1,189 @@
 "use client";
 
-
-
 import {
-
-Trash2
-
+  Trash2
 } from "lucide-react";
-
-
-
+import { DefaultVariant } from "@/constants/variants";
 
 interface Props {
-
-
-variant:any;
-
-
-index:number;
-
-
-onChange:(
-
-index:number,
-
-key:string,
-
-value:any
-
-)=>void;
-
-
-onDelete:(
-
-index:number
-
-)=>void;
-
-
+  variant: DefaultVariant;
+  index: number;
+  onChange: (
+    index: number,
+    key: string,
+    value: unknown
+  ) => void;
+  onDelete: (
+    index: number
+  ) => void;
 }
-
-
-
 
 export default function VariantTableRow({
-
-variant,
-
-index,
-
-onChange,
-
-onDelete
-
-}:Props){
-
-
-
-return (
-
-<div
-
-className="
-grid
-grid-cols-6
-gap-3
-items-center
-border-b
-py-3
-"
-
->
-
-
-
-
-<input
-
-value={variant.sku || ""}
-
-onChange={(e)=>
-
-onChange(
-
-index,
-
-"sku",
-
-e.target.value
-
-)
-
-}
-
-className="
-border
-rounded
-px-2
-py-1
-"
-
-/>
-
-
-
-
-
-<input
-
-value={variant.size || ""}
-
-onChange={(e)=>
-
-onChange(
-
-index,
-
-"size",
-
-e.target.value
-
-)
-
-}
-
-className="
-border
-rounded
-px-2
-py-1
-"
-
-/>
-
-
-
-
-
-<input
-
-value={variant.color || ""}
-
-onChange={(e)=>
-
-onChange(
-
-index,
-
-"color",
-
-e.target.value
-
-)
-
-}
-
-className="
-border
-rounded
-px-2
-py-1
-"
-
-/>
-
-
-
-
-
-
-<input
-
-type="number"
-
-value={variant.stock || 0}
-
-onChange={(e)=>
-
-onChange(
-
-index,
-
-"stock",
-
-Number(e.target.value)
-
-)
-
-}
-
-className="
-border
-rounded
-px-2
-py-1
-"
-
-/>
-
-
-
-
-
-<input
-
-type="number"
-
-value={variant.price || 0}
-
-onChange={(e)=>
-
-onChange(
-
-index,
-
-"price",
-
-Number(e.target.value)
-
-)
-
-}
-
-className="
-border
-rounded
-px-2
-py-1
-"
-
-/>
-
-
-
-
-
-
-<button
-
-onClick={()=>onDelete(index)}
-
-className="
-text-red-500
-"
-
->
-
-
-<Trash2 size={18}/>
-
-
-</button>
-
-
-
-
-</div>
-
-);
-
-
+  variant,
+  index,
+  onChange,
+  onDelete
+}: Props) {
+  return (
+    <div
+      className="
+        grid
+        grid-cols-6
+        gap-3
+        items-center
+        border-b
+        py-3
+        px-2
+        hover:bg-gray-50/50
+        transition-colors
+      "
+    >
+      <input
+        type="text"
+        placeholder="SKU"
+        value={variant.sku || ""}
+        onChange={(e) =>
+          onChange(
+            index,
+            "sku",
+            e.target.value
+          )
+        }
+        className="
+          border
+          rounded-lg
+          px-3
+          py-1.5
+          text-sm
+          focus:outline-none
+          focus:ring-2
+          focus:ring-black
+        "
+      />
+
+      <input
+        type="text"
+        placeholder="Size"
+        value={variant.size || ""}
+        onChange={(e) =>
+          onChange(
+            index,
+            "size",
+            e.target.value
+          )
+        }
+        className="
+          border
+          rounded-lg
+          px-3
+          py-1.5
+          text-sm
+          focus:outline-none
+          focus:ring-2
+          focus:ring-black
+        "
+      />
+
+      <div className="flex items-center gap-2">
+        <input
+          type="color"
+          value={variant.colorHex || "#000000"}
+          onChange={(e) =>
+            onChange(
+              index,
+              "colorHex",
+              e.target.value
+            )
+          }
+          className="w-7 h-7 rounded border p-0.5 cursor-pointer shrink-0"
+        />
+        <input
+          type="text"
+          placeholder="Color"
+          value={variant.color || ""}
+          onChange={(e) =>
+            onChange(
+              index,
+              "color",
+              e.target.value
+            )
+          }
+          className="
+            border
+            rounded-lg
+            px-3
+            py-1.5
+            text-sm
+            w-full
+            focus:outline-none
+            focus:ring-2
+            focus:ring-black
+          "
+        />
+      </div>
+
+      <input
+        type="number"
+        placeholder="Stock"
+        value={variant.stock === 0 ? "" : variant.stock}
+        onChange={(e) =>
+          onChange(
+            index,
+            "stock",
+            e.target.value === "" ? 0 : Number(e.target.value)
+          )
+        }
+        className="
+          border
+          rounded-lg
+          px-3
+          py-1.5
+          text-sm
+          focus:outline-none
+          focus:ring-2
+          focus:ring-black
+        "
+      />
+
+      <input
+        type="number"
+        placeholder="Price"
+        value={variant.price === 0 ? "" : variant.price}
+        onChange={(e) =>
+          onChange(
+            index,
+            "price",
+            e.target.value === "" ? 0 : Number(e.target.value)
+          )
+        }
+        className="
+          border
+          rounded-lg
+          px-3
+          py-1.5
+          text-sm
+          focus:outline-none
+          focus:ring-2
+          focus:ring-black
+        "
+      />
+
+      <div className="flex justify-center">
+        <button
+          type="button"
+          onClick={() => onDelete(index)}
+          className="
+            p-1.5
+            text-red-500
+            hover:bg-red-50
+            rounded-lg
+            transition-colors
+          "
+          aria-label="Delete variant row"
+        >
+          <Trash2 size={18} />
+        </button>
+      </div>
+    </div>
+  );
 }

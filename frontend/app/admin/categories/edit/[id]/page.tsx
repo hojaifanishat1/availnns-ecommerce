@@ -7,10 +7,13 @@ import { getAdminCategories, updateCategory } from "@/services/category.service"
 import { uploadAvatar } from "@/services/upload.service";
 import { Category } from "@/types/category";
 
+export const dynamic = "force-dynamic";
+
 export default function EditCategoryPage() {
   const router = useRouter();
-  const params = useParams();
-  const id = params.id as string;
+  const params = useParams<{ id?: string | string[] }>();
+  const rawId = params?.id;
+  const id = typeof rawId === "string" ? rawId : Array.isArray(rawId) ? rawId[0] : undefined;
 
   const [form, setForm] = useState({ name: "", description: "", parent: "", image: "" });
   const [categories, setCategories] = useState<Category[]>([]);

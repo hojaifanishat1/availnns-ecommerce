@@ -22,6 +22,8 @@ import ProductGallery from "@/components/product/ProductGallery";
 import ProductInfo from "@/components/product/ProductInfo";
 import ProductSection from "@/components/product/ProductSection";
 
+export const dynamic = "force-dynamic";
+
 export default function ProductDetailsPage({
   params,
 }: {
@@ -64,7 +66,8 @@ export default function ProductDetailsPage({
     const load = async () => {
       try {
         setLoading(true);
-        const { id } = await params;
+        const resolvedParams = await params;
+        const id = resolvedParams.id;
 
         const [
           productRes,

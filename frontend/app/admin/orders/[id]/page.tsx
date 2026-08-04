@@ -10,14 +10,17 @@ import {
 import { toast } from "sonner";
 import { getOrderById, updateOrderStatus, updatePayment } from "@/services/order.service";
 
+export const dynamic = "force-dynamic";
+
 const statusSteps = ["pending", "processing", "shipped", "delivered", "cancelled"];
 const paymentMethods = ["Cash on Delivery", "bKash", "Nagad", "Credit Card"];
 const paymentStatuses = ["pending", "paid", "failed", "refunded"];
 
 export default function OrderDetailsPage() {
-  const params = useParams();
+  const params = useParams<{ id?: string | string[] }>();
   const router = useRouter();
-  const id = params.id as string;
+  const rawId = params?.id;
+  const id = typeof rawId === "string" ? rawId : Array.isArray(rawId) ? rawId[0] : undefined;
 
   const [order, setOrder] = useState<any>(null);
   const [loading, setLoading] = useState(true);
