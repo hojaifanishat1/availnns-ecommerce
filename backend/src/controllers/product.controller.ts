@@ -80,6 +80,7 @@ export const createProduct = async (req: Request, res: Response): Promise<void> 
       isFeatured: req.body.isFeatured === "true",
       isBestSeller: req.body.isBestSeller === "true",
       isNewArrival: req.body.isNewArrival === "true",
+      isFuture: req.body.isFuture === "true",
       isDeal: req.body.isDeal === "true",
     };
 
@@ -240,6 +241,7 @@ export const updateProduct = async (req: Request, res: Response): Promise<void> 
     if (req.body.isFeatured !== undefined) data.isFeatured = req.body.isFeatured === "true";
     if (req.body.isBestSeller !== undefined) data.isBestSeller = req.body.isBestSeller === "true";
     if (req.body.isNewArrival !== undefined) data.isNewArrival = req.body.isNewArrival === "true";
+    if (req.body.isFuture !== undefined) data.isFuture = req.body.isFuture === "true";
     if (req.body.isDeal !== undefined) data.isDeal = req.body.isDeal === "true";
     if (req.body.isPublished !== undefined) data.isPublished = req.body.isPublished === "true";
 
@@ -422,6 +424,34 @@ export const getDealProducts = async (
     res.status(500).json({
       success: false,
       message: "Failed to fetch deal products",
+      error: error.message,
+    });
+  }
+};
+
+export const getFutureProducts = async (
+  req: Request,
+  res: Response
+): Promise<void> => {
+  try {
+    const products = await Product.find({
+      isFuture: true,
+      isPublished: true,
+    })
+      .populate("category")
+      .sort({
+        createdAt: -1,
+      })
+      .limit(10);
+
+    res.status(200).json({
+      success: true,
+      products: addDiscountPercentageToProducts(products),
+    });
+  } catch (error: any) {
+    res.status(500).json({
+      success: false,
+      message: "Failed to fetch future products",
       error: error.message,
     });
   }

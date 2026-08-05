@@ -1,8 +1,10 @@
 "use client";
 
+import { useState } from "react";
 import {
   Plus,
   Trash2,
+  ClipboardList,
 } from "lucide-react";
 
 import SectionCard
@@ -26,6 +28,7 @@ export default function AttributeStep() {
     updateField
   } = useProductFormContext();
 
+  const [bulkText, setBulkText] = useState("");
   const attributes: AttributeItem[] =
     form.attributes || [];
 
@@ -76,6 +79,39 @@ export default function AttributeStep() {
     );
   };
 
+  const handleBulkAdd = () => {
+    const parsed = bulkText
+      .split(/\n|\r\n|\t|;|,/)
+      .map((entry) => entry.trim())
+      .filter(Boolean);
+
+    if (parsed.length === 0) {
+      return;
+    }
+
+    const converted = parsed
+      .map((entry) => {
+        const separatorIndex = entry.indexOf(":") >= 0 ? entry.indexOf(":") : entry.indexOf("=");
+
+        if (separatorIndex === -1) {
+          return null;
+        }
+
+        const name = entry.slice(0, separatorIndex).trim();
+        const value = entry.slice(separatorIndex + 1).trim();
+
+        return name && value ? { name, value } : null;
+      })
+      .filter(Boolean) as AttributeItem[];
+
+    if (converted.length === 0) {
+      return;
+    }
+
+    updateField("attributes", [...attributes, ...converted]);
+    setBulkText("");
+  };
+
   return (
     <div
       className="
@@ -86,6 +122,38 @@ export default function AttributeStep() {
         title="Product Attributes"
         description="Add custom product properties and descriptive tags."
       >
+        <div className="rounded-xl border border-dashed border-gray-200 bg-gray-50/60 p-4 space-y-3">
+          <div className="flex items-center gap-2 text-sm font-semibold text-gray-700">
+            <ClipboardList size={16} />
+            Bulk Add / Paste All
+          </div>
+          <p className="text-sm text-gray-500">
+            Paste lines like: Material: Cotton, Fit: Regular, Sleeve: Long Sleeve
+          </p>
+          <textarea
+            value={bulkText}
+            onChange={(e) => setBulkText(e.target.value)}
+            placeholder="Paste all attributes here in one go..."
+            className="w-full min-h-28 rounded-lg border border-gray-200 bg-white px-3 py-2.5 text-sm text-gray-900 focus:outline-none focus:ring-2 focus:ring-black"
+          />
+          <div className="flex flex-wrap gap-2">
+            <button
+              type="button"
+              onClick={handleBulkAdd}
+              className="bg-black text-white px-4 py-2.5 rounded-lg text-sm font-medium hover:bg-gray-800 transition-colors"
+            >
+              Add Bulk Attributes
+            </button>
+            <button
+              type="button"
+              onClick={addAttribute}
+              className="border border-gray-300 bg-white text-gray-700 px-4 py-2.5 rounded-lg text-sm font-medium hover:bg-gray-50 transition-colors"
+            >
+              Add Single Row
+            </button>
+          </div>
+        </div>
+
         <button
           type="button"
           onClick={addAttribute}

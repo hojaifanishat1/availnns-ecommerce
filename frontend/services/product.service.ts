@@ -56,6 +56,15 @@ export const getDealProducts = async (): Promise<Product[]> => {
 };
 
 // =========================
+// FUTURE PRODUCTS
+// =========================
+
+export const getFutureProducts = async (): Promise<Product[]> => {
+  const res = await api.get("/products/future-products");
+  return res.data.products || [];
+};
+
+// =========================
 // RELATED PRODUCTS
 // =========================
 

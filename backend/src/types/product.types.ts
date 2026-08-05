@@ -59,6 +59,8 @@ export interface IProduct {
 
   isNewArrival: boolean;
 
+  isFuture: boolean;
+
   isDeal: boolean;
 
   totalSold?: number; // <-- এই লাইনটি যুক্ত করা হয়েছে

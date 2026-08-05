@@ -139,6 +139,7 @@ text-gray-400
 ["/shop","All Products"],
 ["/best-sellers","Best Sellers"],
 ["/new-arrivals","New Arrivals"],
+["/future-products","Future Products"],
 ["/deals","Deals"]
 ].map(([href,label])=>(
 

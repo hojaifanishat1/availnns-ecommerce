@@ -8,6 +8,7 @@ import {
   getBestSellerProducts,
   getNewArrivalProducts,
   getDealProducts,
+  getFutureProducts,
 } from "@/services/product.service";
 
 
@@ -77,6 +78,22 @@ export const fetchDealProducts =
     }
   );
 
+// ===============================
+// FETCH FUTURE PRODUCTS
+// ===============================
+
+export const fetchFutureProducts =
+  createAsyncThunk(
+    "products/fetchFutureProducts",
+
+    async () => {
+      const data =
+        await getFutureProducts();
+
+      return data;
+    }
+  );
+
 
 // ===============================
 // TYPES
@@ -88,6 +105,8 @@ interface ProductState {
   bestSellers: any[];
 
   newArrivals: any[];
+
+  futureProducts: any[];
 
   deals: any[];
 
@@ -107,6 +126,8 @@ const initialState: ProductState = {
   bestSellers: [],
 
   newArrivals: [],
+
+  futureProducts: [],
 
   deals: [],
 
@@ -238,6 +259,38 @@ const productSlice = createSlice({
 
           state.newArrivals =
             action.payload || [];
+        }
+      )
+
+      .addCase(
+        fetchFutureProducts.pending,
+
+        (state) => {
+          state.loading = true;
+
+          state.error = null;
+        }
+      )
+
+      .addCase(
+        fetchFutureProducts.fulfilled,
+
+        (state, action: any) => {
+          state.loading = false;
+
+          state.futureProducts =
+            action.payload || [];
+        }
+      )
+
+      .addCase(
+        fetchFutureProducts.rejected,
+
+        (state) => {
+          state.loading = false;
+
+          state.error =
+            "Failed to load future products";
         }
       )
 

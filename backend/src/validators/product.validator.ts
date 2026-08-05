@@ -20,6 +20,14 @@ export const createProductSchema = z.object({
 
     isFeatured: z.coerce.boolean().optional(),
 
+    isBestSeller: z.coerce.boolean().optional(),
+
+    isNewArrival: z.coerce.boolean().optional(),
+
+    isFuture: z.coerce.boolean().optional(),
+
+    isDigital: z.coerce.boolean().optional(),
+
     isPublished: z.coerce.boolean().optional(),
 
     tags: z

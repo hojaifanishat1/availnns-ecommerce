@@ -82,6 +82,7 @@ function WizardContent() {
     data.append("isFeatured", String(Boolean(productForm.flags?.isFeatured)));
     data.append("isBestSeller", String(Boolean(productForm.flags?.isBestSeller)));
     data.append("isNewArrival", String(Boolean(productForm.flags?.isNewArrival)));
+    data.append("isFuture", String(Boolean(productForm.flags?.isFuture)));
     data.append("isDigital", String(Boolean(productForm.flags?.isDigital)));
     data.append("shippingClass", productForm.shippingClass || "standard");
     data.append("shipping", JSON.stringify(productForm.shipping || {}));

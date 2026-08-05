@@ -22,7 +22,8 @@ import { Sparkles } from "lucide-react";
 export default function BasicInfoStep() {
   const {
     form,
-    updateField
+    updateField,
+    updateNestedField
   } = useProductFormContext();
 
   const [categories, setCategories] = useState<Category[]>([]);
@@ -65,7 +66,7 @@ export default function BasicInfoStep() {
 
   const parentCategories = categories.filter((category) => !category.parent);
   const subCategories = categories.filter((category) => {
-    const parentId = typeof category.parent === "string" ? category.parent : category.parent?._id;
+    const parentId = typeof category.parent === "string" ? category.parent : (category.parent as any)?._id;
     return parentId === form.category;
   });
 
@@ -196,6 +197,79 @@ export default function BasicInfoStep() {
                 )
               }
             />
+          </div>
+
+          <div className="mt-6 rounded-2xl border border-dashed border-gray-200 bg-gray-50 p-5">
+            <h3 className="text-base font-semibold text-gray-900">Product Flags</h3>
+            <p className="text-sm text-gray-500 mb-4">
+              Mark this product as featured, best seller, new arrival, or digital for collection listings.
+            </p>
+
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+              <label className="flex items-center gap-3 rounded-xl border border-gray-200 bg-white px-4 py-3 cursor-pointer">
+                <input
+                  type="checkbox"
+                  checked={Boolean(form.flags?.isFeatured)}
+                  onChange={(e) =>
+                    updateNestedField(
+                      "flags",
+                      "isFeatured",
+                      e.target.checked
+                    )
+                  }
+                  className="w-4 h-4 rounded border-gray-300 text-black focus:ring-black"
+                />
+                <span className="text-sm font-medium text-gray-900">Featured Product</span>
+              </label>
+
+              <label className="flex items-center gap-3 rounded-xl border border-gray-200 bg-white px-4 py-3 cursor-pointer">
+                <input
+                  type="checkbox"
+                  checked={Boolean(form.flags?.isBestSeller)}
+                  onChange={(e) =>
+                    updateNestedField(
+                      "flags",
+                      "isBestSeller",
+                      e.target.checked
+                    )
+                  }
+                  className="w-4 h-4 rounded border-gray-300 text-black focus:ring-black"
+                />
+                <span className="text-sm font-medium text-gray-900">Best Seller</span>
+              </label>
+
+              <label className="flex items-center gap-3 rounded-xl border border-gray-200 bg-white px-4 py-3 cursor-pointer">
+                <input
+                  type="checkbox"
+                  checked={Boolean(form.flags?.isNewArrival)}
+                  onChange={(e) =>
+                    updateNestedField(
+                      "flags",
+                      "isNewArrival",
+                      e.target.checked
+                    )
+                  }
+                  className="w-4 h-4 rounded border-gray-300 text-black focus:ring-black"
+                />
+                <span className="text-sm font-medium text-gray-900">New Arrival</span>
+              </label>
+
+              <label className="flex items-center gap-3 rounded-xl border border-gray-200 bg-white px-4 py-3 cursor-pointer">
+                <input
+                  type="checkbox"
+                  checked={Boolean(form.flags?.isDigital)}
+                  onChange={(e) =>
+                    updateNestedField(
+                      "flags",
+                      "isDigital",
+                      e.target.checked
+                    )
+                  }
+                  className="w-4 h-4 rounded border-gray-300 text-black focus:ring-black"
+                />
+                <span className="text-sm font-medium text-gray-900">Digital Product</span>
+              </label>
+            </div>
           </div>
         </div>
       </SectionCard>

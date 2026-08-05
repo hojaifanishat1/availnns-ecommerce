@@ -49,9 +49,24 @@ export default function CategoryPage({ params }: Props) {
 
         foundCat = findCategoryBySlug(categoryTree, slug);
 
+        // সাব-ক্যাটাগরির স্লাগগুলো সংগ্রহ করার একটি রিকার্সিভ হেল্পার ফাংশন
+        const getAllSubSlugs = (cat: any): string[] => {
+          let slugs = [cat.slug];
+          if (cat.children && cat.children.length > 0) {
+            for (const child of cat.children) {
+              slugs = [...slugs, ...getAllSubSlugs(child)];
+            }
+          }
+          return slugs;
+        };
+
+        let targetSlugs: string[] = [slug];
+
         if (foundCat) {
           setCategoryName(foundCat.name);
           setSubCategories(foundCat.children || []);
+          // মেইন ক্যাটাগরি হলে তার নিজের স্লাগ এবং তার সব সাব-ক্যাটাগরির স্লাগ এক সাথে নেওয়া
+          targetSlugs = getAllSubSlugs(foundCat);
         } else {
           setCategoryName(slug ? slug.replaceAll("-", " ") : "All Products");
           setSubCategories([]);
@@ -63,9 +78,10 @@ export default function CategoryPage({ params }: Props) {
         if (slug && slug !== "all") {
           const filteredProducts = allProducts.filter((p: any) => {
             const categorySlug = p.category?.slug || p.category;
-            const subcategorySlug = p.subcategory?.slug || p.subcategory;
+            const subcategorySlug = p.subcategory?.slug || p.subcategory || p.subCategory?.slug || p.subCategory;
             
-            return categorySlug === slug || subcategorySlug === slug;
+            // মেইন ক্যাটাগরি বা সাব-ক্যাটাগরির যেকোনো একটির স্লাগের সাথে মিলে গেলে তা দেখাবে
+            return targetSlugs.includes(categorySlug) || targetSlugs.includes(subcategorySlug);
           });
 
           setProducts(filteredProducts);

@@ -13,6 +13,7 @@ import {
   getTopPickProducts,
   getNewArrivalProducts,
   getDealProducts,
+  getFutureProducts,
   getRelatedProducts,
   updateDealStatus,
 } from "../controllers/product.controller";
@@ -56,6 +57,11 @@ router.get(
 router.get(
   "/deals",
   getDealProducts
+);
+
+router.get(
+  "/future-products",
+  getFutureProducts
 );
 
 router.get(

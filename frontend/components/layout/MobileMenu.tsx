@@ -14,6 +14,7 @@ const menuItems = [
   { title: "Categories", href: "/categories" },
   { title: "Best Sellers", href: "/best-sellers" },
   { title: "New Arrivals", href: "/new-arrivals" },
+  { title: "Future Products", href: "/future-products" },
   { title: "Deals", href: "/deals" },
   { title: "Contact", href: "/contact" },
 ];

@@ -1,5 +1,6 @@
 "use client";
 
+import { useEffect } from "react";
 import {
   useProductFormContext
 } from "@/context/ProductFormContext";
@@ -17,7 +18,25 @@ export default function VariantStep() {
     updateField
   } = useProductFormContext();
 
-  const variants: DefaultVariant[] = form.variants || [];
+  // টাইপ এরর এড়াতে টাইপ অ্যাসার্শন ব্যবহার করা হয়েছে
+  const variants: DefaultVariant[] = (form.variants as DefaultVariant[]) || [];
+
+  // ভেরিয়েন্টের স্টক পরিবর্তন হলে অটো মোট স্টক আপডেট করার লজিক
+  useEffect(() => {
+    if (variants.length > 0) {
+      const totalStock = variants.reduce((sum, variant) => {
+        return sum + (Number(variant.stock) || 0);
+      }, 0);
+      
+      if (form.stock !== totalStock) {
+        updateField("stock", totalStock);
+      }
+    } else {
+      if (form.stock !== 0) {
+        updateField("stock", 0);
+      }
+    }
+  }, [variants, form.stock, updateField]);
 
   const addVariant = () => {
     const newVariant: DefaultVariant = {
@@ -71,16 +90,17 @@ export default function VariantStep() {
     );
   };
 
-  const handleGenerate = (generatedVariants: DefaultVariant[]) => {
+  const handleGenerate = (generatedVariants: any[]) => {
     const basePrice = form.pricing?.price || 0;
-    const variantsWithPrice = generatedVariants.map((v) => ({
+    const variantsWithDefaults: DefaultVariant[] = generatedVariants.map((v) => ({
       ...v,
       price: v.price || basePrice,
+      discountPrice: v.discountPrice || 0, // এখানে discountPrice নিশ্চিত করা হলো
     }));
 
     updateField(
       "variants",
-      variantsWithPrice
+      variantsWithDefaults
     );
   };
 

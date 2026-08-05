@@ -152,6 +152,7 @@ export default function EditProductPage() {
             isFeatured: Boolean(productData?.isFeatured ?? productData?.flags?.isFeatured ?? false),
             isBestSeller: Boolean(productData?.isBestSeller ?? productData?.flags?.isBestSeller ?? false),
             isNewArrival: Boolean(productData?.isNewArrival ?? productData?.flags?.isNewArrival ?? false),
+            isFuture: Boolean(productData?.isFuture ?? productData?.flags?.isFuture ?? false),
             isDigital: Boolean(productData?.isDigital ?? productData?.flags?.isDigital ?? false),
           },
           status: productData?.status || productData?.isPublished ? "published" : "draft",
@@ -267,3 +268,4 @@ export default function EditProductPage() {
     </div>
   );
 }
+    

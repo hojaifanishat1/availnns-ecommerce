@@ -30,6 +30,7 @@ export interface ProductFlags {
   isFeatured: boolean;
   isBestSeller: boolean;
   isNewArrival: boolean;
+  isFuture: boolean;
   isDigital: boolean;
 }
 

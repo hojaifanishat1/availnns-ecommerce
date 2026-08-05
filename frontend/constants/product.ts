@@ -133,6 +133,8 @@ export const DEFAULT_PRODUCT_FORM: ProductForm = {
 
     isNewArrival: false,
 
+    isFuture: false,
+
     isDigital: false,
   },
 

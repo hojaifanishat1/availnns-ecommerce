@@ -133,6 +133,11 @@ const productSchema = new Schema<IProduct>(
       default: false,
     },
 
+    isFuture: {
+      type: Boolean,
+      default: false,
+    },
+
     // =========================
     // DEAL PRODUCT
     // =========================
