@@ -31,6 +31,9 @@ export default function ProductCard({
   onQuickView,
   freeDeliveryThreshold = 1000,
 }: ProductCardProps) {
+  // Type assertion to handle backend product schema fields safely
+  const p = product as any;
+
   const { cart, addItem, updateItem } = useCart();
   const { addToWishlist, removeFromWishlist, isInWishlist } = useWishlist();
   const { formatPrice } = useCurrency();
@@ -39,10 +42,26 @@ export default function ProductCard({
   const [currentIndex, setCurrentIndex] = useState(0);
   const [isTransitioning, setIsTransitioning] = useState(true);
 
-  const isWishlisted = isInWishlist(product._id);
+  const isWishlisted = isInWishlist(p._id);
 
-  const primaryImage = product.images?.[0]?.url || "/placeholder.png";
-  const secondaryImage = product.images?.[1]?.url || primaryImage;
+  const primaryImage = p.images?.[0]?.url || "/placeholder.png";
+  const secondaryImage = p.images?.[1]?.url || primaryImage;
+
+  // Safe stock calculation from root or inventory object or variants
+  const totalVariantStock = p.variants?.reduce(
+    (acc: number, v: any) => acc + Number(v.stock || 0),
+    0
+  );
+
+  const stock = Number(
+    p.stock !== undefined
+      ? p.stock
+      : p.inventory?.stock !== undefined
+      ? p.inventory.stock
+      : p.variants?.length > 0
+      ? totalVariantStock
+      : 0
+  );
 
   const cartItem = cart?.items?.find((item: any) => {
     const itemProduct = item.product || {};
@@ -51,16 +70,17 @@ export default function ProductCard({
         ? itemProduct
         : itemProduct._id?.toString() || itemProduct.id?.toString();
 
-    return itemProductId === product._id?.toString();
+    return itemProductId === p._id?.toString();
   });
 
   const quantity = Number(cartItem?.quantity || 0);
 
-  const regularPrice = product.price;
+  const regularPrice = p.price || p.pricing?.price || 0;
   const salePrice =
-    product.discountPrice ||
-    (product as any).oldPrice ||
-    (product as any).compareAtPrice;
+    p.discountPrice ||
+    p.oldPrice ||
+    p.compareAtPrice ||
+    p.pricing?.discountPrice;
 
   const discountPercentage =
     salePrice && salePrice < regularPrice
@@ -70,7 +90,7 @@ export default function ProductCard({
   const handleIncreaseCart = async (e: React.MouseEvent) => {
     e.preventDefault();
     e.stopPropagation();
-    if (quantity >= product.stock) return;
+    if (quantity >= stock) return;
     await addItem(product, 1);
   };
 
@@ -78,28 +98,28 @@ export default function ProductCard({
     e.preventDefault();
     e.stopPropagation();
     if (quantity <= 1) {
-      await updateItem(product._id, 0);
+      await updateItem(p._id, 0);
       return;
     }
-    await updateItem(product._id, quantity - 1);
+    await updateItem(p._id, quantity - 1);
   };
 
-  const rating = product.rating || 0;
-  const numReviews = product.numReviews || 0;
+  const rating = p.rating || p.ratingsAverage || 0;
+  const numReviews = p.numReviews || p.ratingsQuantity || 0;
 
   const categoryName =
-    typeof product.category === "string"
-      ? product.category
-      : product.category?.name || "General";
+    typeof p.category === "string"
+      ? p.category
+      : p.category?.name || "General";
 
   // Base Slide Items
   const baseSlideItems = useMemo(() => {
     const items = [];
 
-    if (product.stock > 0 && product.stock <= 5) {
+    if (stock > 0 && stock <= 5) {
       items.push({
         icon: <AlertTriangle size={13} className="text-amber-500 shrink-0" />,
-        text: `Hurry! Only ${product.stock} items left`,
+        text: `Hurry! Only ${stock} items left`,
         textColor: "text-amber-600 font-medium",
       });
     }
@@ -125,9 +145,9 @@ export default function ProductCard({
     });
 
     return items;
-  }, [product.stock, categoryName, discountPercentage, freeDeliveryThreshold, formatPrice]);
+  }, [stock, categoryName, discountPercentage, freeDeliveryThreshold, formatPrice]);
 
-  // Seamless Extended List (Appending the first item at the end for flawless loop)
+  // Seamless Extended List
   const extendedSlideItems = useMemo(() => {
     if (baseSlideItems.length <= 1) return baseSlideItems;
     return [...baseSlideItems, baseSlideItems[0]];
@@ -168,26 +188,26 @@ export default function ProductCard({
           onMouseEnter={() => setHoverImage(true)}
           onMouseLeave={() => setHoverImage(false)}
         >
-          <Link href={`/products/${product._id}`} className="block h-full w-full">
+          <Link href={`/products/${p._id}`} className="block h-full w-full">
             <Image
               src={hoverImage ? secondaryImage : primaryImage}
-              alt={product.name || "Product image"}
+              alt={p.name || "Product image"}
               fill
               sizes="(max-width: 768px) 100vw, 25vw"
               className={`object-cover transition-transform duration-700 group-hover:scale-105 ${
-                product.stock === 0 ? "grayscale opacity-60" : ""
+                stock === 0 ? "grayscale opacity-60" : ""
               }`}
             />
           </Link>
 
           {/* Product Status Badges */}
           <div className="absolute left-3 top-3 flex flex-col gap-1 z-10 pointer-events-none">
-            {product.isBestSeller && product.stock > 0 && (
+            {p.isBestSeller && stock > 0 && (
               <span className="rounded-md bg-zinc-900 px-2.5 py-1 text-[11px] font-bold tracking-wide text-white shadow-xs">
                 Hot
               </span>
             )}
-            {product.stock === 0 && (
+            {stock === 0 && (
               <span className="rounded-md bg-zinc-800 px-2.5 py-1 text-[11px] font-bold tracking-wide text-white shadow-xs">
                 Sold Out
               </span>
@@ -201,11 +221,11 @@ export default function ProductCard({
               e.preventDefault();
               e.stopPropagation();
               if (isWishlisted) {
-                removeFromWishlist(product._id);
+                removeFromWishlist(p._id);
               } else {
                 addToWishlist({
-                  _id: product._id,
-                  name: product.name,
+                  _id: p._id,
+                  name: p.name,
                   price: salePrice && salePrice > 0 ? salePrice : regularPrice,
                   image: primaryImage,
                 });
@@ -239,10 +259,10 @@ export default function ProductCard({
             {quantity === 0 ? (
               <button
                 type="button"
-                disabled={product.stock === 0}
+                disabled={stock === 0}
                 onClick={handleIncreaseCart}
                 className={`flex h-11 w-11 items-center justify-center rounded-2xl shadow-lg transition hover:scale-110 active:scale-95 cursor-pointer backdrop-blur-md ${
-                  product.stock === 0
+                  stock === 0
                     ? "bg-gray-200/80 text-gray-400 cursor-not-allowed"
                     : "bg-white/90 text-zinc-900 hover:bg-zinc-900 hover:text-white"
                 }`}
@@ -265,7 +285,7 @@ export default function ProductCard({
                 </span>
                 <button
                   type="button"
-                  disabled={quantity >= product.stock}
+                  disabled={quantity >= stock}
                   onClick={handleIncreaseCart}
                   className="cursor-pointer text-zinc-300 hover:text-white transition disabled:opacity-40"
                 >
@@ -278,9 +298,9 @@ export default function ProductCard({
 
         {/* Product Details Section */}
         <div className="pt-4 px-1">
-          <Link href={`/products/${product._id}`}>
+          <Link href={`/products/${p._id}`}>
             <h3 className="font-semibold text-sm text-zinc-900 line-clamp-1 transition hover:text-zinc-600">
-              {product.name}
+              {p.name}
             </h3>
           </Link>
 
@@ -308,7 +328,7 @@ export default function ProductCard({
               )}
             </div>
 
-            {discountPercentage > 0 && product.stock > 0 && (
+            {discountPercentage > 0 && stock > 0 && (
               <span className="rounded-md bg-rose-50 px-2 py-0.5 text-[11px] font-extrabold text-rose-600">
                 -{discountPercentage}%
               </span>
@@ -317,7 +337,7 @@ export default function ProductCard({
         </div>
       </div>
 
-      {/* Footer Info Slider (Fixed Height & Perfect Vertical Center) */}
+      {/* Footer Info Slider */}
       <div className="mt-3 pt-2.5 border-t border-gray-100 px-1 overflow-hidden h-7 relative flex items-center">
         <div
           className={`absolute left-0 right-0 top-0 flex flex-col ${

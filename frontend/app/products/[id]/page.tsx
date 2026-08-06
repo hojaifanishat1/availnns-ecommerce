@@ -36,7 +36,7 @@ export default function ProductDetailsPage({
   const [recent, setRecent] = useState<Product[]>([]);
   const [bestSeller, setBestSeller] = useState<Product[]>([]);
   const [topPicks, setTopPicks] = useState<Product[]>([]);
-  
+
   // Location & Zone States (Info Only)
   const [matchedRegularZone, setMatchedRegularZone] = useState<any>(null);
   const [matchedExpressZone, setMatchedExpressZone] = useState<any>(null);
@@ -176,6 +176,29 @@ export default function ProductDetailsPage({
     load();
   }, [params]);
 
+  // Recently Viewed প্রোডাক্ট লোকালস্টোরেজে সেভ করার লজিক
+  useEffect(() => {
+    if (product && typeof window !== "undefined") {
+      try {
+        const existing = localStorage.getItem("recently_viewed");
+        let viewedList = existing ? JSON.parse(existing) : [];
+
+        viewedList = viewedList.filter(
+          (p: any) => (p._id?.toString() || p.id) !== (product._id?.toString() || product._id)
+        );
+
+        viewedList.unshift(product);
+        if (viewedList.length > 10) {
+          viewedList = viewedList.slice(0, 10);
+        }
+
+        localStorage.setItem("recently_viewed", JSON.stringify(viewedList));
+      } catch (error) {
+        console.error("Failed to save recently viewed product:", error);
+      }
+    }
+  }, [product]);
+
   const handleReviewSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setReviewError("");
@@ -270,7 +293,7 @@ export default function ProductDetailsPage({
 
         {/* Main Product Section */}
         <section className="grid gap-10 lg:grid-cols-12 bg-white rounded-3xl p-6 sm:p-8 lg:p-10 border border-gray-100 shadow-sm">
-          <div className="lg:col-span-7">
+          <div className="lg:col-span-7 space-y-8">
             <ProductGallery product={product} />
           </div>
 
@@ -381,6 +404,16 @@ export default function ProductDetailsPage({
             </div>
           </div>
         </section>
+
+        {/* Product Description Section */}
+        {product.description && (
+          <section className="mt-12 bg-white rounded-3xl p-6 sm:p-8 lg:p-10 border border-gray-100 shadow-sm space-y-4">
+            <h3 className="text-xs font-extrabold text-zinc-900 uppercase tracking-wider">Description</h3>
+            <div className="text-xs text-zinc-600 leading-relaxed whitespace-pre-line bg-zinc-50/50 p-5 rounded-2xl border border-zinc-100">
+              {product.description}
+            </div>
+          </section>
+        )}
 
         {/* Customer Reviews Section */}
         <section className="mt-12 bg-white rounded-3xl p-6 sm:p-8 lg:p-10 border border-gray-100 shadow-sm space-y-8">

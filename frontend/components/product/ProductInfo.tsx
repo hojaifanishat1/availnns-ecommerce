@@ -37,30 +37,138 @@ export default function ProductInfo({
 
   const [quantity, setQuantity] = useState(1);
   const [adding, setAdding] = useState(false);
+
+  // Deep fallback to catch variants from any admin schema or properties
+  const rawVariants = 
+    product.variants || 
+    (product as any).itemVariants || 
+    (product as any).productVariants || 
+    (product as any).options || 
+    (product as any).attributes || 
+    (product as any).sizes ||
+    [];
+
+  // Normalize variants to always be an array
+  const variantsList = Array.isArray(rawVariants) ? rawVariants : Object.values(rawVariants);
+
+  // Extract unique sizes safely covering all schemas & direct string/object variants
+  const availableSizes = Array.from(
+    new Set(
+      variantsList.flatMap((v: any) => {
+        if (!v) return [];
+        if (typeof v === "string") return [v];
+        return [
+          v.size,
+          v.name && String(v.name).toLowerCase().includes("size") ? v.value : null,
+          v.attributes?.size,
+          v.options?.find((o: any) => o.name?.toLowerCase() === "size")?.value,
+          typeof v.name === "string" && !v.color ? v.name : null,
+          typeof v.title === "string" ? v.title : null
+        ];
+      }).filter(Boolean)
+    )
+  );
+
+  // Extract unique colors safely covering all schemas
+  const availableColors = Array.from(
+    new Set(
+      variantsList.flatMap((v: any) => {
+        if (!v || typeof v === "string") return [];
+        return [
+          v.color,
+          v.name && String(v.name).toLowerCase().includes("color") ? v.value : null,
+          v.attributes?.color,
+          v.options?.find((o: any) => o.name?.toLowerCase() === "color")?.value
+        ];
+      }).filter(Boolean)
+    )
+  );
+
   const [selectedSize, setSelectedSize] = useState(
-    product.sizes?.[0] || ""
+    availableSizes[0] || (product as any).size || ""
   );
   const [selectedColor, setSelectedColor] = useState(
-    product.colors?.[0] || ""
+    availableColors[0] || (product as any).color || ""
+  );
+
+  // Find the exact variant based on user selection
+  const selectedVariant = variantsList.find((v: any) => {
+    if (!v) return false;
+    if (typeof v === "string") return v === selectedSize;
+
+    const vSize =
+      v.size ||
+      v.attributes?.size ||
+      v.options?.find((o: any) => o.name?.toLowerCase() === "size")?.value ||
+      (typeof v.name === "string" && !v.color ? v.name : null) ||
+      v.title;
+    
+    const vColor =
+      v.color ||
+      v.attributes?.color ||
+      v.options?.find((o: any) => o.name?.toLowerCase() === "color")?.value;
+
+    const matchSize = !selectedSize || String(vSize)?.trim() === String(selectedSize)?.trim();
+    const matchColor = !selectedColor || String(vColor)?.trim() === String(selectedColor)?.trim();
+    return matchSize && matchColor;
+  });
+
+  // Variant specific stock and price with comprehensive fallbacks
+  const totalVariantStock = variantsList.reduce(
+    (acc: number, v: any) => acc + Number(v?.stock || v?.quantity || 0),
+    0
+  );
+
+  const currentStock = Number(
+    selectedVariant?.stock !== undefined
+      ? selectedVariant.stock
+      : selectedVariant?.quantity !== undefined
+      ? selectedVariant.quantity
+      : (product as any).stock !== undefined
+      ? (product as any).stock
+      : product.inventory?.stock !== undefined
+      ? product.inventory.stock
+      : variantsList.length && totalVariantStock > 0
+      ? totalVariantStock
+      : 10
+  );
+
+  const basePrice = Number(
+    selectedVariant?.price && Number(selectedVariant.price) > 0
+      ? selectedVariant.price
+      : (product as any).price && Number((product as any).price) > 0
+      ? (product as any).price
+      : product.pricing?.price || 0
+  );
+
+  const currentPrice = basePrice;
+
+  const discountPrice = Number(
+    selectedVariant?.discountPrice && Number(selectedVariant.discountPrice) > 0
+      ? selectedVariant.discountPrice
+      : (product as any).discountPrice && Number((product as any).discountPrice) > 0
+      ? (product as any).discountPrice
+      : product.pricing?.discountPrice || 0
   );
 
   // States for interactive features
   const [copied, setCopied] = useState(false);
   const [isWishlisted, setIsWishlisted] = useState(false);
+  const [isSpecsOpen, setIsSpecsOpen] = useState(false);
   const [showAllSpecs, setShowAllSpecs] = useState(false);
   const [isDescExpanded, setIsDescExpanded] = useState(false);
 
+  const lowStockThreshold = product.inventory?.lowStockThreshold || 5;
+
   const discountPercentage =
-    product.discountPrice && product.discountPrice < product.price
-      ? Math.round(
-          ((product.price - product.discountPrice) / product.price) * 100
-        )
+    discountPrice && discountPrice < currentPrice
+      ? Math.round(((currentPrice - discountPrice) / currentPrice) * 100)
       : 0;
 
   const salePrice =
-    product.discountPrice && product.discountPrice > 0
-      ? product.discountPrice
-      : product.price;
+    discountPrice && discountPrice > 0
+      ? discountPrice
+      : currentPrice;
 
   const handleAddToCart = async () => {
     try {
@@ -69,6 +177,7 @@ export default function ProductInfo({
         ...product,
         selectedSize,
         selectedColor,
+        price: salePrice,
       };
       await addItem(productWithSelections, quantity);
       router.push("/cart");
@@ -85,6 +194,7 @@ export default function ProductInfo({
         ...product,
         selectedSize,
         selectedColor,
+        price: salePrice,
       };
       await addItem(productWithSelections, quantity);
       router.push("/checkout");
@@ -93,7 +203,6 @@ export default function ProductInfo({
     }
   };
 
-  // Share and Copy Link handlers
   const handleShare = async () => {
     if (navigator.share) {
       try {
@@ -118,12 +227,11 @@ export default function ProductInfo({
 
   const categoryName: string =
     typeof product.category === "object" && product.category !== null
-      ? product.category.name
+      ? (product.category as any).name || "General"
       : typeof product.category === "string"
       ? product.category
       : "General";
 
-  // Specifications slicing for Show More/Less
   const specsList = product.specifications || [];
   const displayedSpecs = showAllSpecs ? specsList : specsList.slice(0, 4);
 
@@ -131,35 +239,35 @@ export default function ProductInfo({
     <div className="space-y-6">
       {/* BADGES */}
       <div className="flex gap-2.5 flex-wrap">
-        {product.isBestSeller && (
+        {product.flags?.isBestSeller && (
           <span className="bg-zinc-900 text-white px-3.5 py-1.5 rounded-full flex items-center gap-1.5 text-xs font-semibold shadow-xs">
             <BadgeCheck size={15} className="text-amber-400" />
             Best Seller
           </span>
         )}
 
-        {product.isNewArrival && (
+        {product.flags?.isNewArrival && (
           <span className="bg-emerald-600 text-white px-3.5 py-1.5 rounded-full flex items-center gap-1.5 text-xs font-semibold shadow-xs">
             <Sparkles size={15} />
             New Arrival
           </span>
         )}
 
-        <span className={`px-3 py-1.5 rounded-full flex items-center gap-1.5 text-xs font-medium border ${product.stock > 0 ? "bg-emerald-50 text-emerald-700 border-emerald-200" : "bg-rose-50 text-rose-700 border-rose-200"}`}>
-          {product.stock > 0 ? <PackageCheck size={14} /> : <AlertCircle size={14} />}
-          {product.stock > 0 ? `In Stock (${product.stock} available)` : "Out of Stock"}
+        <span className={`px-3 py-1.5 rounded-full flex items-center gap-1.5 text-xs font-medium border ${currentStock > 0 ? "bg-emerald-50 text-emerald-700 border-emerald-200" : "bg-rose-50 text-rose-700 border-rose-200"}`}>
+          {currentStock > 0 ? <PackageCheck size={14} /> : <AlertCircle size={14} />}
+          {currentStock > 0 ? `In Stock (${currentStock} available)` : "Out of Stock"}
         </span>
 
         {/* Low Stock Warning */}
-        {product.stock > 0 && product.stock <= 5 && (
+        {currentStock > 0 && currentStock <= lowStockThreshold && (
           <span className="bg-amber-50 text-amber-700 border border-amber-200 px-3 py-1.5 rounded-full flex items-center gap-1.5 text-xs font-semibold animate-pulse">
             <AlertCircle size={14} />
-            Only {product.stock} left in stock!
+            Only {currentStock} left in stock!
           </span>
         )}
       </div>
 
-      {/* TITLE & ACTIONS (Wishlist, Share, Copy Link) */}
+      {/* TITLE & ACTIONS */}
       <div className="flex items-start justify-between gap-4">
         <div>
           {product.brand && (
@@ -205,13 +313,13 @@ export default function ProductInfo({
             <Star
               key={i}
               size={16}
-              fill={i <= Math.round(product.rating || 0) ? "currentColor" : "none"}
-              className={i <= Math.round(product.rating || 0) ? "" : "text-zinc-300"}
+              fill={i <= Math.round(product.ratingsAverage || 0) ? "currentColor" : "none"}
+              className={i <= Math.round(product.ratingsAverage || 0) ? "" : "text-zinc-300"}
             />
           ))}
         </div>
         <span className="text-xs sm:text-sm font-medium text-zinc-600">
-          <strong className="text-zinc-900">{product.rating || 0}</strong> ({product.numReviews || 0} Customer Reviews)
+          <strong className="text-zinc-900">{product.ratingsAverage || 0}</strong> ({product.ratingsQuantity || 0} Customer Reviews)
         </span>
       </div>
 
@@ -222,10 +330,10 @@ export default function ProductInfo({
             {formatPrice(salePrice)}
           </h2>
 
-          {product.discountPrice > 0 && (
+          {discountPrice && discountPrice > 0 && (
             <div className="flex items-center gap-2">
               <span className="line-through text-zinc-400 text-lg font-medium">
-                {formatPrice(product.price)}
+                {formatPrice(currentPrice)}
               </span>
               <span className="bg-rose-100 text-rose-600 text-xs font-bold px-2.5 py-1 rounded-lg">
                 -{discountPercentage}% OFF
@@ -234,20 +342,18 @@ export default function ProductInfo({
           )}
         </div>
 
-        {/* You Save & Tax info */}
         <div className="flex items-center justify-between text-xs text-zinc-500 pt-1 border-t border-zinc-200/60 flex-wrap gap-2">
-          {product.discountPrice > 0 && (
+          {discountPrice && discountPrice > 0 && (
             <span className="text-emerald-600 font-semibold">
-              You Save: {formatPrice(product.price - salePrice)} ({discountPercentage}%)
+              You Save: {formatPrice(currentPrice - salePrice)} ({discountPercentage}%)
             </span>
           )}
           <span className="text-zinc-500">Tax Included</span>
-          <span className="text-zinc-700 font-medium">EMI Available (Starting from ৳{Math.round(salePrice / 3)}/mo)</span>
         </div>
       </div>
 
       {/* SIZE SELECTION */}
-      {product.sizes && product.sizes.length > 0 && (
+      {availableSizes.length > 0 && (
         <div className="space-y-2.5">
           <div className="flex items-center justify-between">
             <h3 className="font-bold text-sm text-zinc-900">
@@ -255,7 +361,7 @@ export default function ProductInfo({
             </h3>
           </div>
           <div className="flex gap-2.5 flex-wrap">
-            {product.sizes.map((size) => (
+            {availableSizes.map((size: string) => (
               <button
                 key={size}
                 onClick={() => setSelectedSize(size)}
@@ -273,7 +379,7 @@ export default function ProductInfo({
       )}
 
       {/* COLOR SELECTION */}
-      {product.colors && product.colors.length > 0 && (
+      {availableColors.length > 0 && (
         <div className="space-y-2.5">
           <div className="flex items-center justify-between">
             <h3 className="font-bold text-sm text-zinc-900">
@@ -281,7 +387,7 @@ export default function ProductInfo({
             </h3>
           </div>
           <div className="flex gap-2.5 flex-wrap">
-            {product.colors.map((color) => (
+            {availableColors.map((color: string) => (
               <button
                 key={color}
                 onClick={() => setSelectedColor(color)}
@@ -317,7 +423,7 @@ export default function ProductInfo({
             </span>
 
             <button
-              disabled={quantity >= product.stock}
+              disabled={quantity >= currentStock}
               onClick={() => setQuantity((q) => q + 1)}
               className="border border-zinc-200 rounded-xl p-2.5 hover:bg-zinc-100 disabled:opacity-40 transition cursor-pointer text-zinc-800"
               aria-label="Increase quantity"
@@ -330,12 +436,12 @@ export default function ProductInfo({
         {/* BUTTONS */}
         <div className="flex flex-col sm:flex-row gap-3 pt-2">
           <button
-            disabled={adding || product.stock === 0}
+            disabled={adding || currentStock === 0}
             onClick={handleAddToCart}
             className="flex-1 bg-zinc-900 hover:bg-black text-white rounded-2xl py-4 px-6 font-bold text-sm flex items-center justify-center gap-2 transition cursor-pointer disabled:opacity-50 shadow-md hover:scale-[1.01]"
           >
             <ShoppingCart size={18} />
-            {product.stock === 0
+            {currentStock === 0
               ? "Out Of Stock"
               : adding
               ? "Adding to Cart..."
@@ -343,7 +449,7 @@ export default function ProductInfo({
           </button>
 
           <button
-            disabled={product.stock === 0}
+            disabled={currentStock === 0}
             onClick={buyNow}
             className="flex-1 border-2 border-zinc-900 hover:bg-zinc-900 hover:text-white text-zinc-900 rounded-2xl py-4 px-6 font-bold text-sm transition cursor-pointer disabled:opacity-50 text-center shadow-2xs hover:scale-[1.01]"
           >
@@ -352,7 +458,7 @@ export default function ProductInfo({
         </div>
       </div>
 
-      {/* DESCRIPTION WITH READ MORE */}
+      {/* DESCRIPTION */}
       <div className="bg-white border border-zinc-200/80 rounded-2xl p-5 shadow-2xs space-y-3">
         <h3 className="font-bold text-base text-zinc-900">Description</h3>
         <div className={`text-zinc-600 text-xs sm:text-sm leading-relaxed ${!isDescExpanded ? "line-clamp-3" : ""}`}>
@@ -368,44 +474,60 @@ export default function ProductInfo({
         )}
       </div>
 
-      {/* SPECIFICATIONS WITH TABLE LAYOUT & SHOW MORE/LESS */}
+      {/* SPECIFICATIONS */}
       {specsList.length > 0 && (
         <div className="bg-white border border-zinc-200/80 rounded-2xl p-5 shadow-2xs space-y-3">
-          <div className="flex items-center justify-between">
-            <h3 className="font-bold text-base text-zinc-900">Specifications</h3>
-            <span className="text-xs text-zinc-400 font-medium">{specsList.length} items</span>
-          </div>
-          <div className="divide-y divide-zinc-100 overflow-hidden">
-            {displayedSpecs.map((item, index) => (
-              <div key={index} className="flex justify-between py-2.5 text-xs sm:text-sm">
-                <span className="text-zinc-500 font-medium">{item.key}</span>
-                <span className="font-semibold text-zinc-800 text-right">{item.value}</span>
+          <button
+            onClick={() => setIsSpecsOpen(!isSpecsOpen)}
+            className="w-full flex items-center justify-between text-left cursor-pointer"
+          >
+            <div className="flex items-center gap-2">
+              <h3 className="font-bold text-base text-zinc-900">Specifications</h3>
+              <span className="text-xs bg-zinc-100 text-zinc-600 px-2 py-0.5 rounded-full font-medium">
+                {specsList.length} items
+              </span>
+            </div>
+            <div className="p-1 rounded-full hover:bg-zinc-100 transition text-zinc-700">
+              {isSpecsOpen ? <ChevronUp size={18} /> : <ChevronDown size={18} />}
+            </div>
+          </button>
+
+          {isSpecsOpen && (
+            <div className="space-y-3 pt-2 border-t border-zinc-100 animate-fadeIn">
+              <div className="divide-y divide-zinc-100 overflow-hidden">
+                {displayedSpecs.map((item: any, index: number) => (
+                  <div key={index} className="flex justify-between py-2.5 text-xs sm:text-sm">
+                    <span className="text-zinc-500 font-medium">{item.key}</span>
+                    <span className="font-semibold text-zinc-800 text-right">{item.value}</span>
+                  </div>
+                ))}
               </div>
-            ))}
-          </div>
-          {specsList.length > 4 && (
-            <button
-              onClick={() => setShowAllSpecs(!showAllSpecs)}
-              className="w-full mt-2 py-2 border border-zinc-200 rounded-xl text-xs font-bold text-zinc-700 hover:bg-zinc-50 transition flex items-center justify-center gap-1.5 cursor-pointer"
-            >
-              {showAllSpecs ? (
-                <>Show Less <ChevronUp size={14} /></>
-              ) : (
-                <>Show More Specifications <ChevronDown size={14} /></>
+              {specsList.length > 4 && (
+                <button
+                  onClick={() => setShowAllSpecs(!showAllSpecs)}
+                  className="w-full mt-2 py-2 border border-zinc-200 rounded-xl text-xs font-bold text-zinc-700 hover:bg-zinc-50 transition flex items-center justify-center gap-1.5 cursor-pointer"
+                >
+                  {showAllSpecs ? (
+                    <>Show Less <ChevronUp size={14} /></>
+                  ) : (
+                    <>Show More Specifications <ChevronDown size={14} /></>
+                  )}
+                </button>
               )}
-            </button>
+            </div>
           )}
         </div>
       )}
 
       {/* PRODUCT META INFO */}
       <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
-        <Info title="Stock Status" value={`${product.stock} units`} />
+        <Info title="Stock Status" value={`${currentStock} units`} />
         <Info title="Category" value={categoryName} />
         {product.sku && <Info title="SKU" value={product.sku} />}
         {product.brand && <Info title="Brand" value={product.brand} />}
-        {('weight' in product && (product as any).weight) && <Info title="Weight" value={`${(product as any).weight} kg`} />}
-        {product.warrantyPeriod && <Info title="Warranty" value={product.warrantyPeriod} />}
+        {product.shipping?.weight?.value !== undefined && (
+          <Info title="Weight" value={`${String(product.shipping.weight.value)} ${product.shipping.weight.unit || "kg"}`} />
+        )}
       </div>
 
       {/* TRUST & SERVICE SECTION */}
@@ -415,7 +537,7 @@ export default function ProductInfo({
             <Truck size={18} className="text-zinc-900 shrink-0" />
             <div>
               <p className="font-bold text-zinc-900">Estimated Delivery</p>
-              <p className="text-xs text-zinc-500">3-5 Business Days (Shipping: ৳60)</p>
+              <p className="text-xs text-zinc-500">3-5 Business Days</p>
             </div>
           </div>
 
@@ -443,22 +565,21 @@ export default function ProductInfo({
             </div>
           </div>
         </div>
-
-        {product.freeShipping && (
-          <div className="flex items-center gap-2 pt-2 border-t border-zinc-200/60 text-emerald-600 font-semibold text-xs">
-            <span>🚚 Free Shipping Available on this item</span>
-          </div>
-        )}
       </div>
     </div>
   );
 }
 
-function Info({ title, value }: { title: string; value: string | React.ReactNode }) {
+function Info({ title, value }: { title: string; value: any }) {
+  const displayValue = 
+    typeof value === "object" && value !== null 
+      ? JSON.stringify(value) 
+      : String(value ?? "N/A");
+
   return (
     <div className="bg-white border border-zinc-200/80 rounded-xl p-3.5 shadow-2xs">
       <p className="text-zinc-400 text-[11px] font-medium uppercase tracking-wider">{title}</p>
-      <p className="font-bold text-zinc-800 text-xs sm:text-sm mt-0.5 truncate">{value}</p>
+      <p className="font-bold text-zinc-800 text-xs sm:text-sm mt-0.5 truncate">{displayValue}</p>
     </div>
   );
 }

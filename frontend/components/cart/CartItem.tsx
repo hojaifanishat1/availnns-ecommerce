@@ -80,6 +80,28 @@ export default function CartItem({
     "/placeholder.png";
 
   // =======================
+  // REMOVE HELPER (LocalStorage Sync)
+  // =======================
+  const handleRemoveItem = async () => {
+    // লোকালস্টোরেজে রিমুভ করা প্রোডাক্ট সেভ করা
+    localStorage.setItem(
+      "last_removed_cart_item",
+      JSON.stringify({
+        productId,
+        name,
+        image,
+        status: "Item removed from cart",
+      })
+    );
+
+    // কার্ট পেজকে ইনস্ট্যান্ট আপডেট করার জন্য ইভেন্ট ফায়ার করা
+    window.dispatchEvent(new Event("cartItemRemoved"));
+
+    // মূল রিমুভ ফাংশন কল করা
+    await removeItem(productId);
+  };
+
+  // =======================
   // PLUS
   // =======================
   const increase = async () => {
@@ -103,9 +125,7 @@ export default function CartItem({
     if (
       item.quantity <= 1
     ) {
-      await removeItem(
-        productId
-      );
+      await handleRemoveItem();
       return;
     }
 
@@ -228,7 +248,7 @@ export default function CartItem({
             </div>
 
             <button
-              onClick={() => removeItem(productId)}
+              onClick={handleRemoveItem}
               className="
                 text-gray-400
                 hover:text-red-500
@@ -403,7 +423,7 @@ export default function CartItem({
             </button>
 
             <button
-              onClick={() => removeItem(productId)}
+              onClick={handleRemoveItem}
               className="
                 rounded-xl
                 px-4

@@ -15,8 +15,11 @@ export default function ProductGallery({
 }: {
   product: Product;
 }) {
-  const images = product.images?.length
-    ? product.images
+  // Type assertion to handle backend product schema fields safely
+  const p = product as any;
+
+  const images = p.images?.length
+    ? p.images
     : [
         {
           url: "/placeholder.png",
@@ -29,7 +32,7 @@ export default function ProductGallery({
   const [mousePosition, setMousePosition] = useState({ x: 0, y: 0 });
 
   const { addToWishlist, removeFromWishlist, isInWishlist } = useWishlist();
-  const wish = isInWishlist(product._id);
+  const wish = isInWishlist(p._id);
 
   const nextImage = () => {
     if (selectedIndex < images.length - 1) {
@@ -62,7 +65,7 @@ export default function ProductGallery({
       >
         <img
           src={images[selectedIndex]?.url}
-          alt={product.name || "Product image"}
+          alt={p.name || "Product image"}
           className="h-full w-full object-cover transition-transform duration-200 ease-out"
           style={
             zoom
@@ -78,12 +81,12 @@ export default function ProductGallery({
         <button
           onClick={() => {
             if (wish) {
-              removeFromWishlist(product._id);
+              removeFromWishlist(p._id);
             } else {
               addToWishlist({
-                _id: product._id,
-                name: product.name,
-                price: product.discountPrice || product.price,
+                _id: p._id,
+                name: p.name,
+                price: p.discountPrice || p.price,
                 image: images[0].url,
               });
             }
@@ -144,7 +147,7 @@ export default function ProductGallery({
       {/* THUMBNAILS */}
       {images.length > 1 && (
         <div className="flex gap-3 overflow-x-auto pb-2 scrollbar-hide">
-          {images.map((img, index) => (
+          {images.map((img: any, index: number) => (
             <button
               key={img.public_id || index}
               onClick={() => setSelectedIndex(index)}

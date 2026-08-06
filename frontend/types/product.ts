@@ -6,6 +6,14 @@ import { ProductSpecification } from "./specification";
 
 export type ProductStatus = 'draft' | 'active' | 'inactive' | 'archived';
 
+export interface Category {
+  _id: string;
+  name: string;
+  slug: string;
+  description?: string;
+  isActive?: boolean;
+}
+
 export interface ProductPricing {
   price: number;
   discountPrice?: number;
@@ -42,7 +50,7 @@ export interface Product {
   shortDescription?: string;     // প্রোডাক্ট কার্ড বা প্রিভিউয়ের জন্য
   brand?: string;
   sku?: string;
-  category: string;              // Category ID or Name
+  category: string | Category;   // Category ID (string) অথবা Populated Category Object
   subCategory?: string;
   tags: string[];
 
