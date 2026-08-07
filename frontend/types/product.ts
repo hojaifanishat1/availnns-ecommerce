@@ -1,11 +1,3 @@
-import { ProductShipping } from "./shipping";
-import { ProductVariant } from "./variant";
-import { ProductMedia } from "./media";
-import { ProductSeo } from "./seo";
-import { ProductSpecification } from "./specification";
-
-export type ProductStatus = 'draft' | 'active' | 'inactive' | 'archived';
-
 export interface Category {
   _id: string;
   name: string;
@@ -14,62 +6,117 @@ export interface Category {
   isActive?: boolean;
 }
 
-export interface ProductPricing {
-  price: number;
+export interface IProductImage {
+  url: string;
+  public_id: string;
+  alt?: string;
+}
+
+export interface IProductVariant {
+  sku?: string;
+  size?: string;
+  color?: string;
+  colorHex?: string;
+  stock?: number;
+  price?: number;
   discountPrice?: number;
-  currency?: string;          // যেমন: "SAR", "BDT", "USD"
-  discountStartDate?: string | Date;
-  discountEndDate?: string | Date;
+  image?: string;
+  active?: boolean;
 }
 
-export interface ProductInventory {
-  stock: number;
-  lowStockThreshold: number;
-  trackInventory: boolean;
-  allowBackOrder: boolean;
+export interface IProductSpecification {
+  key: string;
+  value: string;
 }
 
+// ✅ Added missing export types for ProductForm compatibility
 export interface ProductAttribute {
-  name: string;   // যেমন: "Color", "Size"
-  value: string;  // যেমন: "Midnight Black", "XL"
+  key: string;
+  value: any;
 }
 
 export interface ProductFlags {
-  isFeatured: boolean;
-  isBestSeller: boolean;
-  isNewArrival: boolean;
-  isFuture: boolean;
-  isDigital: boolean;
+  isFeatured?: boolean;
+  isBestSeller?: boolean;
+  isNewArrival?: boolean;
+  isFuture?: boolean;
+  isDeal?: boolean;
+  isDigital?: boolean;
+  isPublished?: boolean;
+  isDraft?: boolean;
+  freeShipping?: boolean;
 }
+
+export interface ProductPricing {
+  price: number;
+  discountPrice?: number;
+  stock?: number;
+  lowStockThreshold?: number;
+}
+
+export type ProductStatus = "draft" | "published" | "archived";
 
 export interface Product {
   _id?: string;
   name: string;
-  slug: string;                  // URL ফ্রেন্ডলি নামের জন্য অত্যন্ত জরুরি
+  slug: string;
   description: string;
-  shortDescription?: string;     // প্রোডাক্ট কার্ড বা প্রিভিউয়ের জন্য
+  shortDescription?: string;
   brand?: string;
   sku?: string;
-  category: string | Category;   // Category ID (string) অথবা Populated Category Object
+  category: string | Category;
   subCategory?: string;
+
+  // Pricing & Stock
+  price: number;
+  discountPrice?: number;
+  discountPercentage?: number; // Backend utility theke ashe
+  stock: number;
+  lowStockThreshold?: number;
+  weight?: number;
+
+  // Images & Variants
+  images: IProductImage[];
+  variants?: IProductVariant[];
+  sizes?: string[];
+  colors?: string[];
+
+  specifications?: IProductSpecification[];
+  attributes?: ProductAttribute[];
   tags: string[];
 
-  media: ProductMedia[];         // 'images' এর বদলে 'media' রাখা ভালো যেহেতু ভিডিও থাকতে পারে
-  variants: ProductVariant[];
+  // Status & Flags
+  status?: ProductStatus;
+  isDraft?: boolean;
+  isFeatured?: boolean;
+  isBestSeller?: boolean;
+  isNewArrival?: boolean;
+  isFuture?: boolean;
+  isDeal?: boolean;
+  isDigital?: boolean;
+  isPublished?: boolean;
+  freeShipping?: boolean;
+  totalSold?: number;
 
-  pricing: ProductPricing;
-  inventory: ProductInventory;
-  shipping: ProductShipping;
-  seo: ProductSeo;
-  specifications: ProductSpecification[];
-  attributes: ProductAttribute[];
-  flags: ProductFlags;
-  
-  status: ProductStatus;
+  // Shipping & SEO & Dynamic Fields
+  shippingClass?: string;
+  shipping?: Record<string, any>;
+  seo?: Record<string, any>;
+  categoryFields?: Record<string, any>;
 
-  ratingsAverage?: number;       // রিভিউ ও রেটিংসের জন্য
+  // Reviews & SEO
+  rating?: number;          // অথবা ratingsAverage
+  ratingsAverage?: number;
+  numReviews?: number;      // অথবা ratingsQuantity
   ratingsQuantity?: number;
+  metaTitle?: string;
+  metaDescription?: string;
 
   createdAt?: string | Date;
   updatedAt?: string | Date;
+
+  // Fallbacks for older structure if needed
+  pricing?: { price: number; discountPrice?: number };
+  inventory?: { stock: number; lowStockThreshold?: number };
+  flags?: { isBestSeller?: boolean; isNewArrival?: boolean };
 }

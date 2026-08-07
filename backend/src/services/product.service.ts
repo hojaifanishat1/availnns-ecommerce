@@ -2,13 +2,12 @@ import Product from "../models/Product";
 import { IProduct } from "../types/product.types";
 import { generateSlug } from "../utils/slug";
 
-export const createProduct = async (productData: IProduct) => {
-  const slug = generateSlug(productData.name);
-
+export const createProductService = async (productData: any) => {
+  let slug = generateSlug(productData.name || "");
   const exists = await Product.findOne({ slug });
 
   if (exists) {
-    throw new Error("Product already exists");
+    slug = `${slug}-${Date.now()}`;
   }
 
   return await Product.create({
@@ -17,7 +16,7 @@ export const createProduct = async (productData: IProduct) => {
   });
 };
 
-export const getProducts = async (query: any) => {
+export const getProductsService = async (query: any) => {
   const {
     search,
     category,
@@ -35,6 +34,7 @@ export const getProducts = async (query: any) => {
     filter.$or = [
       { name: { $regex: search, $options: "i" } },
       { brand: { $regex: search, $options: "i" } },
+      { sku: { $regex: search, $options: "i" } },
     ];
   }
 
@@ -72,11 +72,11 @@ export const getProducts = async (query: any) => {
   };
 };
 
-export const getProductById = async (id: string) => {
+export const getProductByIdService = async (id: string) => {
   return await Product.findById(id).populate("category");
 };
 
-export const updateProduct = async (
+export const updateProductService = async (
   id: string,
   productData: Partial<IProduct>
 ) => {
@@ -90,6 +90,6 @@ export const updateProduct = async (
   }).populate("category");
 };
 
-export const deleteProduct = async (id: string) => {
+export const deleteProductService = async (id: string) => {
   return await Product.findByIdAndDelete(id);
 };

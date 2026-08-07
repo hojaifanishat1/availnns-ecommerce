@@ -7,20 +7,14 @@ import {
   ClipboardList,
 } from "lucide-react";
 
-import SectionCard
-from "../shared/SectionCard";
-
-import FormInput
-from "../shared/FormInput";
+import SectionCard from "../shared/SectionCard";
+import FormInput from "../shared/FormInput";
 
 import {
   useProductFormContext,
 } from "@/context/ProductFormContext";
 
-interface AttributeItem {
-  name: string;
-  value: string;
-}
+import { ProductAttribute } from "@/types/product";
 
 export default function AttributeStep() {
   const {
@@ -29,7 +23,7 @@ export default function AttributeStep() {
   } = useProductFormContext();
 
   const [bulkText, setBulkText] = useState("");
-  const attributes: AttributeItem[] =
+  const attributes: ProductAttribute[] =
     form.attributes || [];
 
   const addAttribute = () => {
@@ -38,7 +32,7 @@ export default function AttributeStep() {
       [
         ...attributes,
         {
-          name: "",
+          key: "",
           value: ""
         }
       ]
@@ -59,16 +53,16 @@ export default function AttributeStep() {
 
   const updateAttribute = (
     index: number,
-    key: keyof AttributeItem,
+    field: "key" | "value",
     value: string
   ) => {
     const updated =
       attributes.map(
-        (item: AttributeItem, i: number) =>
+        (item: ProductAttribute, i: number) =>
           i === index
             ? {
                 ...item,
-                [key]: value
+                [field]: value
               }
             : item
       );
@@ -97,12 +91,12 @@ export default function AttributeStep() {
           return null;
         }
 
-        const name = entry.slice(0, separatorIndex).trim();
+        const key = entry.slice(0, separatorIndex).trim();
         const value = entry.slice(separatorIndex + 1).trim();
 
-        return name && value ? { name, value } : null;
+        return key && value ? { key, value } : null;
       })
-      .filter(Boolean) as AttributeItem[];
+      .filter(Boolean) as ProductAttribute[];
 
     if (converted.length === 0) {
       return;
@@ -113,11 +107,7 @@ export default function AttributeStep() {
   };
 
   return (
-    <div
-      className="
-        space-y-6
-      "
-    >
+    <div className="space-y-6">
       <SectionCard
         title="Product Attributes"
         description="Add custom product properties and descriptive tags."
@@ -157,77 +147,40 @@ export default function AttributeStep() {
         <button
           type="button"
           onClick={addAttribute}
-          className="
-            flex
-            items-center
-            gap-2
-            bg-black
-            text-white
-            px-4
-            py-2.5
-            rounded-lg
-            text-sm
-            font-medium
-            hover:bg-gray-800
-            transition-colors
-          "
+          className="flex items-center gap-2 bg-black text-white px-4 py-2.5 rounded-lg text-sm font-medium hover:bg-gray-800 transition-colors"
         >
           <Plus size={18} />
           Add Attribute
         </button>
 
-        <div
-          className="
-            space-y-4
-            mt-5
-          "
-        >
+        <div className="space-y-4 mt-5">
           {attributes.length > 0 ? (
             attributes.map(
-              (attribute: AttributeItem, index: number) => (
+              (attribute: ProductAttribute, index: number) => (
                 <div
                   key={index}
-                  className="
-                    grid
-                    grid-cols-1
-                    md:grid-cols-12
-                    gap-4
-                    items-end
-                    border
-                    p-4
-                    rounded-xl
-                    bg-white
-                    shadow-sm
-                  "
+                  className="grid grid-cols-1 md:grid-cols-12 gap-4 items-end border p-4 rounded-xl bg-white shadow-sm"
                 >
-                  <div
-                    className="
-                      md:col-span-5
-                    "
-                  >
+                  <div className="md:col-span-5">
                     <FormInput
                       label="Attribute Name"
                       placeholder="e.g. Pattern, Fit, Sleeve"
-                      value={attribute.name}
+                      value={attribute.key || ""}
                       onChange={(value) =>
                         updateAttribute(
                           index,
-                          "name",
+                          "key",
                           value
                         )
                       }
                     />
                   </div>
 
-                  <div
-                    className="
-                      md:col-span-6
-                    "
-                  >
+                  <div className="md:col-span-6">
                     <FormInput
                       label="Value"
                       placeholder="e.g. Solid, Regular, Long Sleeve"
-                      value={attribute.value}
+                      value={attribute.value || ""}
                       onChange={(value) =>
                         updateAttribute(
                           index,
@@ -238,24 +191,11 @@ export default function AttributeStep() {
                     />
                   </div>
 
-                  <div
-                    className="
-                      md:col-span-1
-                      flex
-                      justify-center
-                      pb-1
-                    "
-                  >
+                  <div className="md:col-span-1 flex justify-center pb-1">
                     <button
                       type="button"
                       onClick={() => removeAttribute(index)}
-                      className="
-                        p-2
-                        text-red-500
-                        hover:bg-red-50
-                        rounded-lg
-                        transition-colors
-                      "
+                      className="p-2 text-red-500 hover:bg-red-50 rounded-lg transition-colors"
                       aria-label="Remove attribute"
                     >
                       <Trash2 size={20} />

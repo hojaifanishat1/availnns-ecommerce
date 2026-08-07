@@ -20,7 +20,7 @@ import {
   RefreshCw,
   Award,
 } from "lucide-react";
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
 import { Product } from "@/types/product";
 import useCart from "@/hooks/useCart";
@@ -49,49 +49,59 @@ export default function ProductInfo({
     [];
 
   // Normalize variants to always be an array
-  const variantsList = Array.isArray(rawVariants) ? rawVariants : Object.values(rawVariants);
+  const variantsList = Array.isArray(rawVariants) 
+    ? rawVariants 
+    : (rawVariants && typeof rawVariants === "object" ? Object.values(rawVariants) : []);
 
-  // Extract unique sizes safely covering all schemas & direct string/object variants
+  // Extract unique sizes safely covering all schemas (Duplicate prevention via Set)
   const availableSizes = Array.from(
     new Set(
       variantsList.flatMap((v: any) => {
         if (!v) return [];
         if (typeof v === "string") return [v];
-        return [
-          v.size,
-          v.name && String(v.name).toLowerCase().includes("size") ? v.value : null,
-          v.attributes?.size,
-          v.options?.find((o: any) => o.name?.toLowerCase() === "size")?.value,
-          typeof v.name === "string" && !v.color ? v.name : null,
-          typeof v.title === "string" ? v.title : null
-        ];
+        const val = 
+          v.size ||
+          (v.name && String(v.name).toLowerCase().includes("size") ? v.value : null) ||
+          v.attributes?.size ||
+          v.options?.find((o: any) => o.name?.toLowerCase() === "size")?.value ||
+          (typeof v.name === "string" && !v.color ? v.name : null) ||
+          v.title;
+        return val ? [String(val).trim()] : [];
       }).filter(Boolean)
     )
   );
 
-  // Extract unique colors safely covering all schemas
+  // Extract unique colors safely covering all schemas (Duplicate prevention via Set)
   const availableColors = Array.from(
     new Set(
       variantsList.flatMap((v: any) => {
         if (!v || typeof v === "string") return [];
-        return [
-          v.color,
-          v.name && String(v.name).toLowerCase().includes("color") ? v.value : null,
-          v.attributes?.color,
-          v.options?.find((o: any) => o.name?.toLowerCase() === "color")?.value
-        ];
+        const val = 
+          v.color ||
+          (v.name && String(v.name).toLowerCase().includes("color") ? v.value : null) ||
+          v.attributes?.color ||
+          v.options?.find((o: any) => o.name?.toLowerCase() === "color")?.value;
+        return val ? [String(val).trim()] : [];
       }).filter(Boolean)
     )
   );
 
-  const [selectedSize, setSelectedSize] = useState(
-    availableSizes[0] || (product as any).size || ""
+  const [selectedSize, setSelectedSize] = useState<string>(
+    (availableSizes[0] as string) || (product as any).size || ""
   );
-  const [selectedColor, setSelectedColor] = useState(
-    availableColors[0] || (product as any).color || ""
+  const [selectedColor, setSelectedColor] = useState<string>(
+    (availableColors[0] as string) || (product as any).color || ""
   );
 
-  // Find the exact variant based on user selection
+  useEffect(() => {
+    if (!selectedSize && availableSizes.length > 0) {
+      setSelectedSize(availableSizes[0] as string);
+    }
+    if (!selectedColor && availableColors.length > 0) {
+      setSelectedColor(availableColors[0] as string);
+    }
+  }, [availableSizes, availableColors]);
+
   const selectedVariant = variantsList.find((v: any) => {
     if (!v) return false;
     if (typeof v === "string") return v === selectedSize;
@@ -108,12 +118,15 @@ export default function ProductInfo({
       v.attributes?.color ||
       v.options?.find((o: any) => o.name?.toLowerCase() === "color")?.value;
 
-    const matchSize = !selectedSize || String(vSize)?.trim() === String(selectedSize)?.trim();
-    const matchColor = !selectedColor || String(vColor)?.trim() === String(selectedColor)?.trim();
-    return matchSize && matchColor;
+    const matchSize = !selectedSize || String(vSize)?.trim().toLowerCase() === String(selectedSize)?.trim().toLowerCase();
+    const matchColor = !selectedColor || String(vColor)?.trim().toLowerCase() === String(selectedColor)?.trim().toLowerCase();
+    
+    if (selectedSize && selectedColor) {
+      return matchSize && matchColor;
+    }
+    return matchSize || matchColor;
   });
 
-  // Variant specific stock and price with comprehensive fallbacks
   const totalVariantStock = variantsList.reduce(
     (acc: number, v: any) => acc + Number(v?.stock || v?.quantity || 0),
     0
@@ -151,7 +164,6 @@ export default function ProductInfo({
       : product.pricing?.discountPrice || 0
   );
 
-  // States for interactive features
   const [copied, setCopied] = useState(false);
   const [isWishlisted, setIsWishlisted] = useState(false);
   const [isSpecsOpen, setIsSpecsOpen] = useState(false);
@@ -175,11 +187,14 @@ export default function ProductInfo({
       setAdding(true);
       const productWithSelections = {
         ...product,
+        price: salePrice,
+        selectedVariantSKU: selectedVariant?.sku || product.sku,
+      };
+      await addItem({
+        ...productWithSelections,
         selectedSize,
         selectedColor,
-        price: salePrice,
-      };
-      await addItem(productWithSelections, quantity);
+      }, quantity);
       router.push("/cart");
     } catch (error) {
       console.log(error);
@@ -192,11 +207,14 @@ export default function ProductInfo({
     try {
       const productWithSelections = {
         ...product,
+        price: salePrice,
+        selectedVariantSKU: selectedVariant?.sku || product.sku,
+      };
+      await addItem({
+        ...productWithSelections,
         selectedSize,
         selectedColor,
-        price: salePrice,
-      };
-      await addItem(productWithSelections, quantity);
+      }, quantity);
       router.push("/checkout");
     } catch (error) {
       console.log(error);
@@ -235,6 +253,9 @@ export default function ProductInfo({
   const specsList = product.specifications || [];
   const displayedSpecs = showAllSpecs ? specsList : specsList.slice(0, 4);
 
+  // Single Clean Description Source (Prevents duplicate rendering)
+  const productDescription = product.description || (product as any).details || "";
+
   return (
     <div className="space-y-6">
       {/* BADGES */}
@@ -258,7 +279,6 @@ export default function ProductInfo({
           {currentStock > 0 ? `In Stock (${currentStock} available)` : "Out of Stock"}
         </span>
 
-        {/* Low Stock Warning */}
         {currentStock > 0 && currentStock <= lowStockThreshold && (
           <span className="bg-amber-50 text-amber-700 border border-amber-200 px-3 py-1.5 rounded-full flex items-center gap-1.5 text-xs font-semibold animate-pulse">
             <AlertCircle size={14} />
@@ -361,7 +381,7 @@ export default function ProductInfo({
             </h3>
           </div>
           <div className="flex gap-2.5 flex-wrap">
-            {availableSizes.map((size: string) => (
+            {availableSizes.map((size: any) => (
               <button
                 key={size}
                 onClick={() => setSelectedSize(size)}
@@ -387,7 +407,7 @@ export default function ProductInfo({
             </h3>
           </div>
           <div className="flex gap-2.5 flex-wrap">
-            {availableColors.map((color: string) => (
+            {availableColors.map((color: any) => (
               <button
                 key={color}
                 onClick={() => setSelectedColor(color)}
@@ -458,21 +478,23 @@ export default function ProductInfo({
         </div>
       </div>
 
-      {/* DESCRIPTION */}
-      <div className="bg-white border border-zinc-200/80 rounded-2xl p-5 shadow-2xs space-y-3">
-        <h3 className="font-bold text-base text-zinc-900">Description</h3>
-        <div className={`text-zinc-600 text-xs sm:text-sm leading-relaxed ${!isDescExpanded ? "line-clamp-3" : ""}`}>
-          <p>{product.description}</p>
+      {/* SINGLE UNIQUE DESCRIPTION */}
+      {productDescription && (
+        <div className="bg-white border border-zinc-200/80 rounded-2xl p-5 shadow-2xs space-y-3">
+          <h3 className="font-bold text-base text-zinc-900">Description</h3>
+          <div className={`text-zinc-600 text-xs sm:text-sm leading-relaxed ${!isDescExpanded ? "line-clamp-3" : ""}`}>
+            <p>{productDescription}</p>
+          </div>
+          {productDescription.length > 150 && (
+            <button
+              onClick={() => setIsDescExpanded(!isDescExpanded)}
+              className="text-xs font-bold text-black underline cursor-pointer pt-1"
+            >
+              {isDescExpanded ? "Show Less" : "Read More"}
+            </button>
+          )}
         </div>
-        {product.description && product.description.length > 150 && (
-          <button
-            onClick={() => setIsDescExpanded(!isDescExpanded)}
-            className="text-xs font-bold text-black underline cursor-pointer pt-1"
-          >
-            {isDescExpanded ? "Show Less" : "Read More"}
-          </button>
-        )}
-      </div>
+      )}
 
       {/* SPECIFICATIONS */}
       {specsList.length > 0 && (
@@ -525,8 +547,8 @@ export default function ProductInfo({
         <Info title="Category" value={categoryName} />
         {product.sku && <Info title="SKU" value={product.sku} />}
         {product.brand && <Info title="Brand" value={product.brand} />}
-        {product.shipping?.weight?.value !== undefined && (
-          <Info title="Weight" value={`${String(product.shipping.weight.value)} ${product.shipping.weight.unit || "kg"}`} />
+        {(product as any).weight !== undefined && Number((product as any).weight) > 0 && (
+          <Info title="Weight" value={`${(product as any).weight} kg`} />
         )}
       </div>
 

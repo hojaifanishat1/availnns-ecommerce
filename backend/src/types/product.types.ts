@@ -2,14 +2,30 @@ import { Types } from "mongoose";
 
 export interface IProductImage {
   url: string;
-
   public_id: string;
+  alt?: string;
 }
 
 export interface IProductSpecification {
   key: string;
-
   value: string;
+}
+
+export interface IProductAttribute {
+  key: string;
+  value: any;
+}
+
+export interface IProductVariant {
+  sku?: string;
+  size?: string;
+  color?: string;
+  colorHex?: string;
+  stock?: number;
+  price?: number;
+  discountPrice?: number;
+  image?: string;
+  active?: boolean;
 }
 
 export interface IProduct {
@@ -19,7 +35,11 @@ export interface IProduct {
 
   description: string;
 
+  shortDescription?: string;
+
   category: Types.ObjectId;
+
+  subCategory?: Types.ObjectId;
 
   brand?: string;
 
@@ -45,13 +65,23 @@ export interface IProduct {
 
   colors?: string[];
 
+  // =========================
+  // PRODUCT VARIANTS
+  // =========================
+  variants?: IProductVariant[];
+
   specifications?: IProductSpecification[];
+
+  attributes?: IProductAttribute[];
 
   tags?: string[];
 
   // =========================
-  // PRODUCT FLAGS
+  // PRODUCT STATUS & FLAGS
   // =========================
+  status?: "draft" | "published" | "archived";
+
+  isDraft?: boolean;
 
   isFeatured: boolean;
 
@@ -63,7 +93,7 @@ export interface IProduct {
 
   isDeal: boolean;
 
-  totalSold?: number; // <-- এই লাইনটি যুক্ত করা হয়েছে
+  totalSold?: number;
 
   isPublished: boolean;
 
@@ -72,17 +102,26 @@ export interface IProduct {
   freeShipping: boolean;
 
   // =========================
+  // SHIPPING & SEO
+  // =========================
+  shippingClass?: "standard" | "express" | "free" | string;
+
+  shipping?: Record<string, any>;
+
+  seo?: Record<string, any>;
+
+  categoryFields?: Record<string, any>;
+
+  // =========================
   // REVIEWS
   // =========================
-
   rating: number;
 
   numReviews: number;
 
   // =========================
-  // SEO
+  // SEO META (Legacy fallback)
   // =========================
-
   metaTitle?: string;
 
   metaDescription?: string;
@@ -90,7 +129,6 @@ export interface IProduct {
   // =========================
   // ELECTRONICS
   // =========================
-
   warrantyPeriod?: string;
 
   storageCapacity?: string;
@@ -104,7 +142,6 @@ export interface IProduct {
   // =========================
   // FASHION
   // =========================
-
   fabricType?: string;
 
   fitType?: string;
@@ -122,7 +159,6 @@ export interface IProduct {
   // =========================
   // TIMESTAMPS
   // =========================
-
   createdAt?: Date;
 
   updatedAt?: Date;

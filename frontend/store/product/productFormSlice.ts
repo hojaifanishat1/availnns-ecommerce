@@ -24,7 +24,7 @@ const productFormSlice = createSlice({
     },
 
     updateProductField: <K extends keyof ProductForm>(
-      state: state,
+      state: ProductFormState,
       action: PayloadAction<{
         field: K;
         value: ProductForm[K];

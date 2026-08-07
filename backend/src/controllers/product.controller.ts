@@ -74,25 +74,33 @@ export const createProduct = async (req: Request, res: Response): Promise<void> 
     const productData: any = {
       ...req.body,
       category: req.body.subCategory || req.body.category || "",
+      subCategory: req.body.subCategory || null,
       slug,
       images,
       isPublished: true,
-      isFeatured: req.body.isFeatured === "true",
-      isBestSeller: req.body.isBestSeller === "true",
-      isNewArrival: req.body.isNewArrival === "true",
-      isFuture: req.body.isFuture === "true",
-      isDeal: req.body.isDeal === "true",
+      isFeatured: req.body.isFeatured === "true" || req.body.isFeatured === true,
+      isBestSeller: req.body.isBestSeller === "true" || req.body.isBestSeller === true,
+      isNewArrival: req.body.isNewArrival === "true" || req.body.isNewArrival === true,
+      isFuture: req.body.isFuture === "true" || req.body.isFuture === true,
+      isDeal: req.body.isDeal === "true" || req.body.isDeal === true,
+      isDraft: req.body.isDraft === "true" || req.body.isDraft === true,
     };
 
-    // FIX ARRAYS
+    // FIX ARRAYS, VARIANTS & COMPLEX OBJECTS
     productData.specifications = parseJSON(req.body.specifications) || [];
+    productData.attributes = parseJSON(req.body.attributes) || [];
     productData.sizes = parseJSON(req.body.sizes) || [];
     productData.colors = parseJSON(req.body.colors) || [];
+    productData.variants = parseJSON(req.body.variants) || [];
+    productData.seo = parseJSON(req.body.seo) || {};
+    productData.shipping = parseJSON(req.body.shipping) || {};
+    productData.categoryFields = parseJSON(req.body.categoryFields) || {};
 
-    // FIX NUMBER
+    // FIX NUMBERS
     if (req.body.price) productData.price = Number(req.body.price);
     if (req.body.discountPrice) productData.discountPrice = Number(req.body.discountPrice);
     if (req.body.stock) productData.stock = Number(req.body.stock);
+    if (req.body.lowStockThreshold) productData.lowStockThreshold = Number(req.body.lowStockThreshold);
 
     const product = await Product.create(productData);
 
@@ -198,7 +206,11 @@ export const updateProduct = async (req: Request, res: Response): Promise<void> 
       return;
     }
 
-    const data: any = { ...req.body, category: req.body.subCategory || req.body.category || req.body.category || "" };
+    const data: any = { 
+      ...req.body, 
+      category: req.body.subCategory || req.body.category || product.category,
+      subCategory: req.body.subCategory || product.subCategory || null 
+    };
 
     if (req.body.oldImages) {
       data.images = JSON.parse(req.body.oldImages);
@@ -222,9 +234,12 @@ export const updateProduct = async (req: Request, res: Response): Promise<void> 
       data.images = normalizedImages;
     }
 
-    // FIX ARRAYS
+    // FIX ARRAYS & VARIANTS
     if (req.body.specifications !== undefined) {
       data.specifications = parseJSON(req.body.specifications) || [];
+    }
+    if (req.body.attributes !== undefined) {
+      data.attributes = parseJSON(req.body.attributes) || [];
     }
     if (req.body.sizes !== undefined) {
       data.sizes = parseJSON(req.body.sizes) || [];
@@ -232,20 +247,34 @@ export const updateProduct = async (req: Request, res: Response): Promise<void> 
     if (req.body.colors !== undefined) {
       data.colors = parseJSON(req.body.colors) || [];
     }
+    if (req.body.variants !== undefined) {
+      data.variants = parseJSON(req.body.variants) || [];
+    }
+    if (req.body.seo !== undefined) {
+      data.seo = parseJSON(req.body.seo) || {};
+    }
+    if (req.body.shipping !== undefined) {
+      data.shipping = parseJSON(req.body.shipping) || {};
+    }
+    if (req.body.categoryFields !== undefined) {
+      data.categoryFields = parseJSON(req.body.categoryFields) || {};
+    }
 
     // FIX NUMBERS & BOOLEANS
     if (req.body.price !== undefined) data.price = Number(req.body.price);
     if (req.body.discountPrice !== undefined) data.discountPrice = Number(req.body.discountPrice);
     if (req.body.stock !== undefined) data.stock = Number(req.body.stock);
+    if (req.body.lowStockThreshold !== undefined) data.lowStockThreshold = Number(req.body.lowStockThreshold);
     
-    if (req.body.isFeatured !== undefined) data.isFeatured = req.body.isFeatured === "true";
-    if (req.body.isBestSeller !== undefined) data.isBestSeller = req.body.isBestSeller === "true";
-    if (req.body.isNewArrival !== undefined) data.isNewArrival = req.body.isNewArrival === "true";
-    if (req.body.isFuture !== undefined) data.isFuture = req.body.isFuture === "true";
-    if (req.body.isDeal !== undefined) data.isDeal = req.body.isDeal === "true";
-    if (req.body.isPublished !== undefined) data.isPublished = req.body.isPublished === "true";
+    if (req.body.isFeatured !== undefined) data.isFeatured = req.body.isFeatured === "true" || req.body.isFeatured === true;
+    if (req.body.isBestSeller !== undefined) data.isBestSeller = req.body.isBestSeller === "true" || req.body.isBestSeller === true;
+    if (req.body.isNewArrival !== undefined) data.isNewArrival = req.body.isNewArrival === "true" || req.body.isNewArrival === true;
+    if (req.body.isFuture !== undefined) data.isFuture = req.body.isFuture === "true" || req.body.isFuture === true;
+    if (req.body.isDeal !== undefined) data.isDeal = req.body.isDeal === "true" || req.body.isDeal === true;
+    if (req.body.isPublished !== undefined) data.isPublished = req.body.isPublished === "true" || req.body.isPublished === true;
+    if (req.body.isDraft !== undefined) data.isDraft = req.body.isDraft === "true" || req.body.isDraft === true;
 
-    const updatedProduct = await Product.findByIdAndUpdate(req.params.id, data, { new: true });
+    const updatedProduct = await Product.findByIdAndUpdate(req.params.id, data, { new: true, runValidators: true });
 
     res.status(200).json({
       success: true,
@@ -535,13 +564,13 @@ export const updateDealStatus = async (
   res: Response
 ): Promise<void> => {
   try {
-    const updatedProduct = await Product.findByIdAndUpdate(
+    const updatedModel = await Product.findByIdAndUpdate(
       req.params.id,
       { isDeal: req.body.isDeal },
       { new: true }
     ).populate("category");
 
-    if (!updatedProduct) {
+    if (!updatedModel) {
       res.status(404).json({ success: false, message: "Product not found" });
       return;
     }
@@ -549,7 +578,7 @@ export const updateDealStatus = async (
     res.status(200).json({
       success: true,
       message: "Deal status updated successfully",
-      product: addDiscountPercentage(updatedProduct),
+      product: addDiscountPercentage(updatedModel),
     });
   } catch (error: any) {
     res.status(500).json({

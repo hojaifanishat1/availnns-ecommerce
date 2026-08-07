@@ -22,10 +22,23 @@ const productSchema = new Schema<IProduct>(
       required: true,
     },
 
+    // ✅ Added shortDescription
+    shortDescription: {
+      type: String,
+      default: "",
+    },
+
     category: {
       type: Schema.Types.ObjectId,
       ref: "Category",
       required: true,
+    },
+
+    // ✅ Added subCategory
+    subCategory: {
+      type: Schema.Types.ObjectId,
+      ref: "Category",
+      default: null,
     },
 
     brand: {
@@ -81,8 +94,11 @@ const productSchema = new Schema<IProduct>(
           type: String,
           required: true,
         },
-
         public_id: {
+          type: String,
+          default: "",
+        },
+        alt: {
           type: String,
           default: "",
         },
@@ -99,17 +115,41 @@ const productSchema = new Schema<IProduct>(
       default: [],
     },
 
+    // =========================
+    // PRODUCT VARIANTS
+    // =========================
+    variants: [
+      {
+        sku: { type: String, default: "" },
+        size: { type: String, default: "" },
+        color: { type: String, default: "" },
+        colorHex: { type: String, default: "#000000" },
+        stock: { type: Number, default: 0 },
+        price: { type: Number, default: 0 },
+        discountPrice: { type: Number, default: 0 },
+        image: { type: String, default: "" },
+        active: { type: Boolean, default: true },
+      },
+    ],
+
     specifications: [
       {
         key: {
           type: String,
           default: "",
         },
-
         value: {
           type: String,
           default: "",
         },
+      },
+    ],
+
+    // ✅ Added attributes
+    attributes: [
+      {
+        key: { type: String, default: "" },
+        value: { type: Schema.Types.Mixed, default: "" },
       },
     ],
 
@@ -139,9 +179,50 @@ const productSchema = new Schema<IProduct>(
     },
 
     // =========================
+    // STATUS & DRAFT (Frontend sync)
+    // =========================
+    status: {
+      type: String,
+      enum: ["draft", "published", "archived"],
+      default: "draft",
+    },
+
+    isDraft: {
+      type: Boolean,
+      default: true,
+    },
+
+    // =========================
+    // SHIPPING & SEO
+    // =========================
+    shippingClass: {
+      type: String,
+      enum: ["standard", "express", "free"],
+      default: "standard",
+    },
+
+    shipping: {
+      type: Object,
+      default: {},
+    },
+
+    seo: {
+      type: Object,
+      default: {},
+    },
+
+    // =========================
+    // DYNAMIC CATEGORY FIELDS
+    // =========================
+    categoryFields: {
+      type: Map,
+      of: Schema.Types.Mixed,
+      default: {},
+    },
+
+    // =========================
     // DEAL PRODUCT
     // =========================
-
     isDeal: {
       type: Boolean,
       default: false,
@@ -150,7 +231,6 @@ const productSchema = new Schema<IProduct>(
     // =========================
     // TOTAL SOLD (AUTO TRACKING)
     // =========================
-
     totalSold: {
       type: Number,
       default: 0,
@@ -194,7 +274,6 @@ const productSchema = new Schema<IProduct>(
     // =========================
     // ELECTRONICS
     // =========================
-
     warrantyPeriod: {
       type: String,
       default: "",
@@ -223,7 +302,6 @@ const productSchema = new Schema<IProduct>(
     // =========================
     // FASHION
     // =========================
-
     fabricType: {
       type: String,
       default: "",

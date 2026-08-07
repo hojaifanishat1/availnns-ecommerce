@@ -89,7 +89,16 @@ function WizardContent() {
     data.append("seo", JSON.stringify(productForm.seo || {}));
     data.append("specifications", JSON.stringify(productForm.specifications || []));
     data.append("attributes", JSON.stringify(productForm.attributes || []));
-    data.append("variants", JSON.stringify(productForm.variants || []));
+    
+    // EXTRACT SIZES & COLORS SAFELY FROM VARIANTS
+    const variants = productForm.variants || [];
+    const extractedSizes = Array.from(new Set(variants.map((v: any) => v?.size).filter(Boolean)));
+    const extractedColors = Array.from(new Set(variants.map((v: any) => v?.color).filter(Boolean)));
+
+    data.append("sizes", JSON.stringify(extractedSizes));
+    data.append("colors", JSON.stringify(extractedColors));
+    data.append("variants", JSON.stringify(variants));
+
     data.append("tags", JSON.stringify(productForm.tags || []));
     data.append("categoryFields", JSON.stringify(productForm.categoryFields || {}));
 
@@ -216,6 +225,7 @@ export default function ProductWizard({
 }) {
   return (
     <ProductFormProvider
+      key={JSON.stringify(initialData?.variants || [])} // <-- FIX: Forces provider to re-initialize when fetched data arrives
       initialData={initialData}
     >
       <ProductWizardProvider

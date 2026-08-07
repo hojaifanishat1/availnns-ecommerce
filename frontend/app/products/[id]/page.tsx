@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useState, use } from "react";
 import { notFound } from "next/navigation";
 import Link from "next/link";
 import { ChevronRight, Home, ShieldCheck, RefreshCw, Truck, Clock, MapPin, Zap, CheckCircle, XCircle, Star } from "lucide-react";
@@ -22,8 +22,6 @@ import ProductGallery from "@/components/product/ProductGallery";
 import ProductInfo from "@/components/product/ProductInfo";
 import ProductSection from "@/components/product/ProductSection";
 
-export const dynamic = "force-dynamic";
-
 export default function ProductDetailsPage({
   params,
 }: {
@@ -31,6 +29,10 @@ export default function ProductDetailsPage({
     id: string;
   }>;
 }) {
+  // Unwrapping params using React.use() for Next.js App Router client components
+  const resolvedParams = use(params);
+  const id = resolvedParams.id;
+
   const [product, setProduct] = useState<Product | null>(null);
   const [related, setRelated] = useState<Product[]>([]);
   const [recent, setRecent] = useState<Product[]>([]);
@@ -66,8 +68,6 @@ export default function ProductDetailsPage({
     const load = async () => {
       try {
         setLoading(true);
-        const resolvedParams = await params;
-        const id = resolvedParams.id;
 
         const [
           productRes,
@@ -85,7 +85,7 @@ export default function ProductDetailsPage({
           getDeliveryZones().catch(() => []),
         ]);
 
-        const currentProduct = productRes.product;
+        const currentProduct = productRes?.product || productRes;
 
         if (!currentProduct) {
           notFound();
@@ -95,18 +95,13 @@ export default function ProductDetailsPage({
         setProduct(currentProduct);
         await fetchReviews(id);
 
-        setRelated(
-          relatedRes.filter((item: Product) => item._id !== id).slice(0, 4)
-        );
-        setRecent(
-          newRes.filter((item: Product) => item._id !== id).slice(0, 4)
-        );
-        setBestSeller(
-          bestRes.filter((item: Product) => item._id !== id).slice(0, 4)
-        );
-        setTopPicks(
-          topPickRes.filter((item: Product) => item._id !== id).slice(0, 4)
-        );
+        const filterItems = (items: any[]) => 
+          Array.isArray(items) ? items.filter((item: Product) => (item._id?.toString() || item._id) !== id).slice(0, 4) : [];
+
+        setRelated(filterItems(relatedRes));
+        setRecent(filterItems(newRes));
+        setBestSeller(filterItems(bestRes));
+        setTopPicks(filterItems(topPickRes));
 
         let activeZones: any[] = [];
         if (Array.isArray(zonesRes)) {
@@ -173,8 +168,10 @@ export default function ProductDetailsPage({
       }
     };
 
-    load();
-  }, [params]);
+    if (id) {
+      load();
+    }
+  }, [id]);
 
   // Recently Viewed প্রোডাক্ট লোকালস্টোরেজে সেভ করার লজিক
   useEffect(() => {

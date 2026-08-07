@@ -64,6 +64,14 @@ router.get(
   getFutureProducts
 );
 
+// ⚠️ ADMIN LOW STOCK রাউটটি ডাইনামিক `/:id`-এর ওপরে আনা হলো যাতে সংঘর্ষ না হয়
+router.get(
+  "/admin/low-stock",
+  authMiddleware,
+  authorize("admin"),
+  getLowStockProducts
+);
+
 router.get(
   "/:id/related",
   getRelatedProducts
@@ -135,17 +143,6 @@ router.put(
   authMiddleware,
   authorize("admin"),
   updateDealStatus
-);
-
-// =================================
-// ADMIN LOW STOCK
-// =================================
-
-router.get(
-  "/admin/low-stock",
-  authMiddleware,
-  authorize("admin"),
-  getLowStockProducts
 );
 
 export default router;
