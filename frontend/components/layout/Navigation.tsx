@@ -57,11 +57,6 @@ const navItems: NavItem[] = [
     badgeColor: "bg-emerald-500 text-white",
   },
   {
-    name: "Future Products",
-    href: "/future-products",
-    icon: "sparkles",
-  },
-  {
     name: "Contact",
     href: "/contact",
     icon: "phone",

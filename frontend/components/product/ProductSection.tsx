@@ -1,6 +1,7 @@
 import Link from "next/link";
 import { Product } from "@/types/product";
 import ProductCard from "./ProductCard";
+import { ArrowRight } from "lucide-react";
 
 export default function ProductSection({
   title,
@@ -14,28 +15,30 @@ export default function ProductSection({
   href?: string;
 }) {
   return (
-    <section className="mt-12 px-4 md:px-8">
+    <section className="mt-16 px-4 md:px-8">
       {/* Header */}
-      <div className="mb-6 flex items-center justify-between">
+      <div className="mb-8 flex items-end justify-between">
         <div>
-          <h2 className="text-2xl font-bold md:text-3xl text-gray-900">{title}</h2>
-          <p className="mt-1 text-sm text-gray-500">{products.length} Products</p>
+          <h2 className="text-2xl sm:text-3xl font-extrabold tracking-tight text-zinc-900">
+            {title}
+          </h2>
         </div>
 
         {viewAll && (
           <Link
             href={href}
-            className="flex-shrink-0 rounded-full border border-gray-300 px-5 py-2 text-sm font-medium transition hover:bg-black hover:text-white"
+            className="group inline-flex items-center gap-2 rounded-2xl bg-zinc-100 hover:bg-zinc-900 text-zinc-800 hover:text-white px-5 py-2.5 text-xs sm:text-sm font-semibold transition-all duration-300 border border-zinc-200/80 shadow-2xs hover:shadow-md cursor-pointer"
           >
-            View All
+            <span>View All</span>
+            <ArrowRight size={16} className="transition-transform duration-300 group-hover:translate-x-1" />
           </Link>
         )}
       </div>
 
       {/* Empty State */}
       {products.length === 0 && (
-        <div className="rounded-3xl bg-gray-50 p-10 text-center text-gray-500">
-          No products found
+        <div className="rounded-[2.5rem] bg-zinc-50/80 border border-zinc-200/80 p-12 text-center shadow-xs">
+          <p className="text-zinc-500 text-sm font-medium">No products found</p>
         </div>
       )}
 
@@ -43,13 +46,13 @@ export default function ProductSection({
       {products.length > 0 && (
         <div className="relative w-full overflow-hidden">
           <div 
-            className="flex gap-4 overflow-x-auto pb-4 pt-1 scroll-smooth"
+            className="flex gap-4 sm:gap-6 overflow-x-auto pb-6 pt-2 scroll-smooth"
             style={{ scrollbarWidth: 'none', msOverflowStyle: 'none' }}
           >
             {products.map((product, index) => (
               <div
                 key={product._id}
-                className="w-[240px] sm:w-[260px] flex-shrink-0 animate-in fade-in duration-500"
+                className="w-[240px] sm:w-[280px] flex-shrink-0 animate-in fade-in zoom-in-95 duration-700 fill-mode-both"
                 style={{
                   animationDelay: `${index * 50}ms`
                 }}
