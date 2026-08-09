@@ -1,29 +1,49 @@
 /**
- * Generates a unique Stock Keeping Unit (SKU) based on the product name.
- * Example: "Wireless Mouse" -> "WIRE-7K3X9A"
- * 
- * @param name - The product name
- * @param customPrefix - Optional custom prefix (e.g., category code)
- * @returns Formatted SKU string
+ * Generates a professional SKU based on Category, Brand, and optional Variants.
+ * Format: [CATEGORY]-[BRAND]-[RANDOM] (with optional variants if provided)
  */
-export default function generateSKU(name: string, customPrefix?: string): string {
-  // যদি নাম না থাকে তবে ফলব্যাক হিসেবে জেনেরিক প্রিফিক্স ব্যবহার করা
-  const cleanName = name ? name.trim() : "PRD";
-  
-  const prefix = (customPrefix || cleanName)
+export default function generateSKU(
+  customPrefix?: string,
+  brand?: string,
+  color?: string,
+  size?: string
+): string {
+  // ১. ক্যাটাগরি প্রিফিক্স
+  let prefix = "PROD";
+  if (customPrefix && customPrefix.trim() !== "") {
+    prefix = customPrefix.toUpperCase().replace(/[^A-Z0-9]/g, "").substring(0, 4);
+  }
+
+  // ২. ব্র্যান্ড কোড
+  let brandPart = "";
+  if (brand && brand.trim() !== "") {
+    brandPart = "-" + brand.toUpperCase().replace(/[^A-Z0-9]/g, "").substring(0, 4);
+  }
+
+  // ৩. কালার ও সাইজ (যদি ৪ নম্বর স্টেপ থেকে পাস করা হয়)
+  let variantPart = "";
+  if (color && color.trim() !== "") {
+    variantPart += "-" + color.toUpperCase().replace(/[^A-Z0-9]/g, "").substring(0, 3);
+  }
+  if (size && size.trim() !== "") {
+    variantPart += "-" + size.toUpperCase().replace(/[^A-Z0-9]/g, "").substring(0, 3);
+  }
+
+  // ৪. ইউনিক র্যান্ডম অংশ
+  const randomBuffer = new Uint8Array(2);
+  if (typeof window !== "undefined" && window.crypto) {
+    window.crypto.getRandomValues(randomBuffer);
+  } else {
+    globalThis.crypto?.getRandomValues(randomBuffer) || 
+      randomBuffer.forEach((_, i) => randomBuffer[i] = Math.floor(Math.random() * 256));
+  }
+
+  const randomPart = Array.from(randomBuffer)
+    .map((b) => b.toString(36))
+    .join("")
     .toUpperCase()
-    .replace(/[^A-Z0-9]/g, "")
-    .substring(0, 4)
-    .padEnd(4, "X"); // যদি নামের দৈর্ঘ্য ৪ অক্ষরের কম হয়, তবে 'X' দিয়ে পূরণ করবে
+    .substring(0, 4);
 
-  // ইউনিক র‍্যান্ডম স্ট্রিং জেনারেট করা
-  const randomPart = Math.random()
-    .toString(36)
-    .substring(2, 8)
-    .toUpperCase();
-
-  // বর্তমান টাইমস্ট্যাম্পের একটি অংশ যোগ করে ইউনিকনেস আরও বাড়িয়ে দেওয়া (অপশনাল কিন্তু নিরাপদ)
-  const timestampPart = Date.now().toString(36).slice(-2).toUpperCase();
-
-  return `${prefix}-${randomPart}${timestampPart}`;
+  // ফাইনাল SKU (যেমন: FASH-NOPT-8K2P)
+  return `${prefix}${brandPart}${variantPart}-${randomPart}`;
 }

@@ -57,7 +57,30 @@ export default function BasicInfoStep() {
   ]);
 
   const handleGenerateSKU = () => {
-    const sku = generateSKU("PRD");
+    // সিলেক্ট করা ক্যাটাগরি খুঁজে বের করে স্মার্ট প্রিফিক্স তৈরি করা
+    const selectedCategory = categories.find(cat => cat._id === form.category);
+    let categoryPrefix = "ITEM";
+
+    if (selectedCategory && selectedCategory.name) {
+      const catName = selectedCategory.name.toLowerCase();
+      
+      if (catName.includes("men") || catName.includes("women") || catName.includes("fashion") || catName.includes("clothing") || catName.includes("apparel")) {
+        categoryPrefix = "FASH";
+      } else if (catName.includes("electronic") || catName.includes("gadget") || catName.includes("phone") || catName.includes("laptop") || catName.includes("tech")) {
+        categoryPrefix = "ELEC";
+      } else if (catName.includes("grocery") || catName.includes("food") || catName.includes("kitchen")) {
+        categoryPrefix = "GROS";
+      } else {
+        categoryPrefix = selectedCategory.name.toUpperCase().replace(/[^A-Z0-9]/g, "").substring(0, 4);
+      }
+    }
+
+    // ক্যাটাগরি প্রিফিক্স এবং ফর্মের ব্র্যান্ড পাস করে প্রফেশনাল SKU তৈরি (যেমন: FASH-NOPT-8K2P)
+    const sku = generateSKU(
+      categoryPrefix, 
+      form.brand || ""
+    );
+    
     updateField(
       "sku",
       sku
@@ -117,7 +140,7 @@ export default function BasicInfoStep() {
             <div className="md:col-span-8">
               <FormInput
                 label="SKU (Stock Keeping Unit)"
-                placeholder="e.g. PRD-XXXXX"
+                placeholder="e.g. FASH-NOPT-XXXX"
                 value={form.sku || ""}
                 onChange={(value) =>
                   updateField(

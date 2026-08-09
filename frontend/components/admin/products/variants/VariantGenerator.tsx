@@ -15,6 +15,27 @@ interface Props {
   ) => void;
 }
 
+// সাধারণ কালারগুলোর জন্য নিখুঁত হেক্স ম্যাপিং
+const getColorHex = (colorName: string): string => {
+  const name = colorName.trim().toLowerCase();
+  const hexMap: Record<string, string> = {
+    red: "#EF4444",
+    blue: "#3B82F6",
+    black: "#000000",
+    white: "#FFFFFF",
+    green: "#10B981",
+    yellow: "#F59E0B",
+    gray: "#6B7280",
+    grey: "#6B7280",
+    purple: "#8B5CF6",
+    pink: "#EC4899",
+    orange: "#F97316",
+    navy: "#1E3A8A",
+    brown: "#92400E",
+  };
+  return hexMap[name] || "#000000"; // ম্যাচ না করলে ডিফল্ট ব্ল্যাক
+};
+
 export default function VariantGenerator({
   onGenerate
 }: Props) {
@@ -56,7 +77,7 @@ export default function VariantGenerator({
             sku: `${size}-${color}`.toUpperCase(),
             size,
             color,
-            colorHex: "#000000",
+            colorHex: getColorHex(color), // এখানে প্রতিটি কালারের সঠিক হেক্স কোড সেট করা হলো
             stock: 0,
             price: 0,
             discountPrice: 0,
@@ -85,7 +106,7 @@ export default function VariantGenerator({
           sku: color.toUpperCase(),
           size: "",
           color,
-          colorHex: "#000000",
+          colorHex: getColorHex(color), // এখানেও সঠিক হেক্স কোড দেওয়া হলো
           stock: 0,
           price: 0,
           discountPrice: 0,

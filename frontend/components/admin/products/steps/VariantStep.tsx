@@ -92,11 +92,36 @@ export default function VariantStep() {
 
   const handleGenerate = (generatedVariants: any[]) => {
     const basePrice = form.pricing?.price || 0;
-    const variantsWithDefaults: DefaultVariant[] = generatedVariants.map((v) => ({
-      ...v,
-      price: v.price || basePrice,
-      discountPrice: v.discountPrice || 0, // এখানে discountPrice নিশ্চিত করা হলো
-    }));
+    
+    const variantsWithDefaults: DefaultVariant[] = generatedVariants.map((v) => {
+      // কালার অবজেক্ট বা স্ট্রিং থেকে সঠিক নাম ও হেক্স কোড বের করার লজিক
+      let colorName = "";
+      let colorHex = "#000000";
+
+      if (typeof v.color === "object" && v.color !== null) {
+        colorName = v.color.name || v.color.label || "";
+        colorHex = v.color.hex || v.color.code || "#000000";
+      } else if (typeof v.color === "string") {
+        colorName = v.color;
+        const hexMap: Record<string, string> = {
+          red: "#EF4444",
+          blue: "#3B82F6",
+          black: "#000000",
+          white: "#FFFFFF",
+          green: "#10B981",
+          yellow: "#F59E0B",
+        };
+        colorHex = hexMap[v.color.toLowerCase()] || "#000000";
+      }
+
+      return {
+        ...v,
+        color: colorName || v.color || "",
+        colorHex: v.colorHex || colorHex,
+        price: v.price || basePrice,
+        discountPrice: v.discountPrice || 0,
+      };
+    });
 
     updateField(
       "variants",

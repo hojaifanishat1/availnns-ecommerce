@@ -5,7 +5,6 @@ import {
   Minus,
   Plus,
   ShoppingCart,
-  BadgeCheck,
   Sparkles,
   Heart,
   Share2,
@@ -13,13 +12,12 @@ import {
   AlertCircle,
   Copy,
   Check,
-  ChevronDown,
-  ChevronUp,
   Zap,
-  SlidersHorizontal,
-  ShieldCheck,
-  Truck,
-  RefreshCw,
+  Flame,
+  ShieldAlert,
+  FileText,
+  Layers,
+  MessageSquare,
 } from "lucide-react";
 import { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
@@ -40,7 +38,7 @@ export default function ProductInfo({
   const [adding, setAdding] = useState(false);
   const [buyingNow, setBuyingNow] = useState(false);
 
-  // Deep fallback to catch variants from any admin schema or properties
+  // Deep fallback for variants from admin panel
   const rawVariants = 
     product.variants || 
     (product as any).itemVariants || 
@@ -54,6 +52,7 @@ export default function ProductInfo({
     ? rawVariants 
     : (rawVariants && typeof rawVariants === "object" ? Object.values(rawVariants) : []);
 
+  // Dynamic Size Extraction
   const availableSizes = Array.from(
     new Set(
       variantsList.flatMap((v: any) => {
@@ -61,16 +60,19 @@ export default function ProductInfo({
         if (typeof v === "string") return [v];
         const val = 
           v.size ||
-          (v.name && String(v.name).toLowerCase().includes("size") ? v.value : null) ||
+          v.capacity ||
+          v.storage ||
+          (v.name && !String(v.name).toLowerCase().includes("color") ? v.value || v.name : null) ||
           v.attributes?.size ||
-          v.options?.find((o: any) => o.name?.toLowerCase() === "size")?.value ||
-          (typeof v.name === "string" && !v.color ? v.name : null) ||
+          v.attributes?.capacity ||
+          v.options?.[0]?.value ||
           v.title;
         return val ? [String(val).trim()] : [];
       }).filter(Boolean)
     )
   );
 
+  // Dynamic Color Extraction
   const availableColors = Array.from(
     new Set(
       variantsList.flatMap((v: any) => {
@@ -107,9 +109,10 @@ export default function ProductInfo({
 
     const vSize =
       v.size ||
+      v.capacity ||
+      v.storage ||
       v.attributes?.size ||
-      v.options?.find((o: any) => o.name?.toLowerCase() === "size")?.value ||
-      (typeof v.name === "string" && !v.color ? v.name : null) ||
+      v.options?.[0]?.value ||
       v.title;
     
     const vColor =
@@ -165,9 +168,7 @@ export default function ProductInfo({
 
   const [copied, setCopied] = useState(false);
   const [isWishlisted, setIsWishlisted] = useState(false);
-  const [isSpecsOpen, setIsSpecsOpen] = useState(true);
-  const [showAllSpecs, setShowAllSpecs] = useState(false);
-  const [isDescExpanded, setIsDescExpanded] = useState(false);
+  const [activeTab, setActiveTab] = useState<"desc" | "specs">("desc");
 
   const lowStockThreshold = product.inventory?.lowStockThreshold || 5;
 
@@ -181,13 +182,38 @@ export default function ProductInfo({
       ? discountPrice
       : currentPrice;
 
+  const displaySku = (() => {
+    const baseSku = 
+      product.sku || 
+      (product as any).itemSku || 
+      (product as any).productSku || 
+      (product as any).code || 
+      "";
+
+    const variantSku = selectedVariant?.sku || "";
+
+    if (baseSku && variantSku) {
+      return variantSku.toUpperCase().includes(baseSku.toUpperCase()) 
+        ? variantSku.toUpperCase() 
+        : `${baseSku}-${variantSku}`.toUpperCase();
+    }
+
+    if (baseSku && (selectedSize || selectedColor)) {
+      const attributes = [selectedSize, selectedColor].filter(Boolean).join("-");
+      return `${baseSku}-${attributes}`.toUpperCase();
+    }
+
+    return baseSku || variantSku || "";
+  })();
+
   const handleAddToCart = async () => {
     try {
       setAdding(true);
       const productWithSelections = {
         ...product,
         price: salePrice,
-        selectedVariantSKU: selectedVariant?.sku || product.sku,
+        sku: displaySku,
+        selectedVariantSKU: displaySku,
       };
       await addItem({
         ...productWithSelections,
@@ -208,7 +234,8 @@ export default function ProductInfo({
       const productWithSelections = {
         ...product,
         price: salePrice,
-        selectedVariantSKU: selectedVariant?.sku || product.sku,
+        sku: displaySku,
+        selectedVariantSKU: displaySku,
       };
       await addItem({
         ...productWithSelections,
@@ -251,336 +278,310 @@ export default function ProductInfo({
     return !key.includes("available size") && !key.includes("available color");
   });
 
-  const displayedSpecs = showAllSpecs ? specsList : specsList.slice(0, 4);
   const productDescription = product.description || (product as any).details || "";
-  const displaySku = selectedVariant?.sku || product.sku;
+
+  // Real ratings & reviews data fallback extraction from product object
+  const ratingsAvg = Number(product.ratingsAverage || (product as any).averageRating || 0);
+  const ratingsQty = Number(product.ratingsQuantity || (product as any).totalReviews || (product as any).numReviews || 0);
 
   return (
-    <div className="space-y-6 font-sans">
+    <div className="space-y-6 font-sans antialiased text-zinc-900">
+      
       {/* 1. TOP BADGES & STATUS BAR */}
       <div className="flex items-center justify-between flex-wrap gap-3">
-        <div className="flex gap-2 flex-wrap">
+        <div className="flex gap-2.5 flex-wrap">
           {product.flags?.isBestSeller && (
-            <span className="bg-gradient-to-r from-zinc-900 via-zinc-800 to-zinc-900 text-amber-300 px-4 py-1.5 rounded-full flex items-center gap-1.5 text-[11px] font-extrabold tracking-wider shadow-md border border-zinc-700/50">
-              <BadgeCheck size={14} className="text-amber-400" />
-              BEST SELLER
+            <span className="bg-gradient-to-r from-amber-500 to-orange-600 text-white px-3.5 py-1.5 rounded-xl flex items-center gap-1.5 text-[11px] font-black tracking-wider shadow-sm">
+              <Flame size={13} className="fill-white" />
+              HOT SELLER
             </span>
           )}
 
           {product.flags?.isNewArrival && (
-            <span className="bg-white/80 text-zinc-900 backdrop-blur-md border border-zinc-200/80 px-4 py-1.5 rounded-full flex items-center gap-1.5 text-[11px] font-extrabold tracking-wider shadow-sm">
-              <Sparkles size={14} className="text-amber-500" />
-              NEW ARRIVAL
+            <span className="bg-gradient-to-r from-zinc-900 to-zinc-800 text-white px-3.5 py-1.5 rounded-xl flex items-center gap-1.5 text-[11px] font-black tracking-wider shadow-sm">
+              <Sparkles size={13} className="text-amber-400" />
+              NEW DROP
             </span>
           )}
 
-          <span className={`px-4 py-1.5 rounded-full flex items-center gap-1.5 text-[11px] font-bold border backdrop-blur-md shadow-2xs ${
+          <span className={`px-3.5 py-1.5 rounded-xl flex items-center gap-1.5 text-[11px] font-bold border transition-all ${
             currentStock > 0 
-              ? "bg-emerald-50/90 text-emerald-700 border-emerald-200/80" 
-              : "bg-rose-50/90 text-rose-700 border-rose-200/80"
+              ? "bg-emerald-50/80 text-emerald-800 border-emerald-200" 
+              : "bg-rose-50/80 text-rose-800 border-rose-200"
           }`}>
-            {currentStock > 0 ? <PackageCheck size={13} className="text-emerald-600" /> : <AlertCircle size={13} className="text-rose-600" />}
-            {currentStock > 0 ? "In Stock" : "Out of Stock"}
+            {currentStock > 0 ? <PackageCheck size={14} className="text-emerald-600" /> : <ShieldAlert size={14} className="text-rose-600" />}
+            {currentStock > 0 ? "In Stock & Ready" : "Sold Out"}
           </span>
         </div>
 
         {currentStock > 0 && currentStock <= lowStockThreshold && (
-          <span className="bg-gradient-to-r from-amber-50 to-orange-50 border border-amber-200/90 text-amber-800 px-3.5 py-1.5 rounded-full flex items-center gap-1.5 text-[11px] font-extrabold animate-pulse shadow-sm">
-            <AlertCircle size={13} className="text-amber-600" />
-            Only {currentStock} left in stock!
+          <span className="bg-amber-500 text-white px-3 py-1.5 rounded-xl flex items-center gap-1.5 text-[11px] font-black animate-pulse shadow-sm">
+            <AlertCircle size={13} />
+            Only {currentStock} items left!
           </span>
         )}
       </div>
 
-      {/* 2. TITLE & LUXURY ACTION BUTTONS */}
+      {/* 2. TITLE, PRICE & REAL REVIEWS HEADER */}
       <div className="flex items-start justify-between gap-4 border-b border-zinc-100 pb-6">
         <div className="min-w-0 flex-1 space-y-3">
-          <div className="flex items-center gap-2 flex-wrap">
+          <div className="flex items-center gap-2.5 flex-wrap">
             {product.brand && (
-              <span className="inline-flex items-center px-3 py-1 rounded-lg bg-zinc-900 text-white text-[10px] font-black uppercase tracking-widest shadow-sm">
+              <span className="inline-flex items-center px-2.5 py-1 rounded-md bg-zinc-100 text-zinc-800 text-[10px] font-extrabold uppercase tracking-widest border border-zinc-200">
                 {product.brand}
               </span>
             )}
             {displaySku && (
-              <span className="inline-flex items-center px-3 py-1 rounded-lg bg-zinc-100/80 border border-zinc-200/80 text-zinc-600 text-[10px] font-mono font-bold tracking-wider">
+              <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-md bg-zinc-50 border border-zinc-200 text-zinc-500 text-[10px] font-mono font-bold tracking-wider">
+                <span className="w-1.5 h-1.5 rounded-full bg-emerald-500" />
                 SKU: {displaySku}
               </span>
             )}
           </div>
 
-          <h1 className="text-2xl sm:text-3xl lg:text-4xl font-black text-zinc-950 tracking-tight leading-[1.15]">
+          <h1 className="text-2xl sm:text-3xl font-black text-zinc-900 tracking-tight leading-snug">
             {product.name}
           </h1>
 
-          <div className="flex items-center gap-3 pt-1">
-            <div className="flex text-amber-400 bg-amber-50/60 px-2.5 py-1 rounded-lg border border-amber-200/40">
+          {/* PRICE */}
+          <div className="flex items-baseline gap-3.5 flex-wrap pt-1">
+            <span className="text-3xl sm:text-4xl font-black tracking-tight text-zinc-950">
+              {formatPrice(salePrice)}
+            </span>
+
+            {discountPrice && discountPrice > 0 && (
+              <div className="flex items-center gap-2.5">
+                <span className="line-through text-zinc-400 text-base font-semibold">
+                  {formatPrice(currentPrice)}
+                </span>
+                <span className="bg-rose-600 text-white font-black text-[10px] px-2 py-0.5 rounded-md uppercase tracking-wider">
+                  Save {discountPercentage}%
+                </span>
+              </div>
+            )}
+          </div>
+
+          {/* REAL RATING & REVIEWS DISPLAY */}
+          <div className="flex items-center gap-2.5 pt-1">
+            <div className="flex text-amber-500 bg-amber-50/80 px-2 py-1 rounded-lg border border-amber-200/60">
               {[1, 2, 3, 4, 5].map((i) => (
                 <Star
                   key={i}
                   size={13}
-                  fill={i <= Math.round(product.ratingsAverage || 0) ? "currentColor" : "none"}
-                  className={i <= Math.round(product.ratingsAverage || 0) ? "text-amber-400" : "text-zinc-300"}
+                  fill={i <= Math.round(ratingsAvg || 0) ? "currentColor" : "none"}
+                  className={i <= Math.round(ratingsAvg || 0) ? "text-amber-500" : "text-zinc-300"}
                 />
               ))}
             </div>
-            <span className="text-xs font-semibold text-zinc-500">
-              <strong className="text-zinc-900 font-bold">{product.ratingsAverage || "4.8"}</strong> 
-              <span className="text-zinc-300 mx-1.5">•</span> 
-              <span className="underline cursor-pointer hover:text-black transition">{product.ratingsQuantity || "124"} Verified Reviews</span>
+            <span className="text-xs font-medium text-zinc-500 flex items-center gap-1.5">
+              <strong className="text-zinc-900 font-bold">{ratingsAvg > 0 ? ratingsAvg.toFixed(1) : "No Rating"}</strong> 
+              <span className="text-zinc-300">•</span> 
+              <span className="text-zinc-600 font-semibold">{ratingsQty} {ratingsQty === 1 ? "Review" : "Reviews"}</span>
             </span>
           </div>
         </div>
 
-        <div className="flex items-center gap-2.5 shrink-0">
+        <div className="flex items-center gap-2 shrink-0">
           <button 
             onClick={() => setIsWishlisted(!isWishlisted)}
-            className={`border rounded-2xl p-3.5 transition-all duration-300 cursor-pointer shadow-xs ${
+            className={`border rounded-xl p-3 transition-all duration-200 cursor-pointer shadow-2xs ${
               isWishlisted 
-                ? "bg-rose-50 border-rose-200 text-rose-600 scale-105 shadow-rose-100" 
-                : "border-zinc-200/80 bg-white/80 hover:border-zinc-300 hover:bg-zinc-50 text-zinc-700"
+                ? "bg-rose-500 border-rose-500 text-white scale-105" 
+                : "border-zinc-200 bg-white hover:border-zinc-300 hover:bg-zinc-50 text-zinc-700"
             }`}
             aria-label="Wishlist"
           >
-            <Heart size={18} fill={isWishlisted ? "currentColor" : "none"} />
+            <Heart size={17} fill={isWishlisted ? "currentColor" : "none"} />
           </button>
           <button 
             onClick={handleShare}
-            className="border border-zinc-200/80 bg-white/85 rounded-2xl p-3.5 hover:border-zinc-300 hover:bg-zinc-50 transition-all duration-300 cursor-pointer text-zinc-700 shadow-xs"
+            className="border border-zinc-200 bg-white rounded-xl p-3 hover:border-zinc-300 hover:bg-zinc-50 transition-all duration-200 cursor-pointer text-zinc-700 shadow-2xs"
             aria-label="Share"
           >
-            <Share2 size={18} />
+            <Share2 size={17} />
           </button>
           <button 
             onClick={handleCopyLink}
-            className="border border-zinc-200/80 bg-white/85 rounded-2xl p-3.5 hover:border-zinc-300 hover:bg-zinc-50 transition-all duration-300 cursor-pointer text-zinc-700 shadow-xs relative"
+            className="border border-zinc-200 bg-white rounded-xl p-3 hover:border-zinc-300 hover:bg-zinc-50 transition-all duration-200 cursor-pointer text-zinc-700 shadow-2xs"
             aria-label="Copy Link"
           >
-            {copied ? <Check size={18} className="text-emerald-600" /> : <Copy size={18} />}
+            {copied ? <Check size={17} className="text-emerald-600" /> : <Copy size={17} />}
           </button>
         </div>
       </div>
 
-      {/* 3. ULTRA-LUXURY PRICING CARD */}
-      <div className="relative overflow-hidden bg-gradient-to-br from-zinc-950 via-zinc-900 to-zinc-900 text-white p-6 sm:p-8 rounded-[2.5rem] shadow-2xl border border-zinc-800/80">
-        <div className="absolute -right-16 -bottom-16 w-56 h-56 bg-amber-500/10 rounded-full blur-3xl pointer-events-none" />
-        <div className="absolute top-0 right-1/4 w-32 h-32 bg-white/5 rounded-full blur-2xl pointer-events-none" />
+      {/* 3. OPTIONS, SIZES, COLORS & BUTTONS CONTAINER */}
+      <div className="bg-gradient-to-b from-zinc-50/70 to-white border border-zinc-200/80 p-5 sm:p-6 rounded-3xl shadow-xs space-y-6">
         
-        <div className="flex items-baseline justify-between flex-wrap gap-4 relative z-10">
-          <div className="space-y-2">
-            <div className="flex items-center gap-2">
-              <span className="w-2 h-2 rounded-full bg-amber-400 animate-pulse" />
-              <p className="text-[10px] font-black uppercase tracking-[0.25em] text-zinc-400">Exclusive Pricing</p>
+        {/* AVAILABLE SIZES */}
+        {availableSizes.length > 0 && (
+          <div className="space-y-2.5">
+            <div className="flex items-center justify-between">
+              <span className="text-xs font-bold text-zinc-500 uppercase tracking-wider">
+                Available Size: <strong className="text-zinc-900">{selectedSize || "Select"}</strong>
+              </span>
             </div>
-            
-            <div className="flex items-center gap-4 flex-wrap">
-              <span className="text-3xl sm:text-5xl font-black tracking-tight text-white drop-shadow-sm">
-                {formatPrice(salePrice)}
+            <div className="flex gap-2.5 flex-wrap">
+              {availableSizes.map((size: any) => (
+                <button
+                  key={size}
+                  onClick={() => setSelectedSize(size)}
+                  className={`border px-5 py-2.5 rounded-xl text-xs font-bold transition-all duration-200 cursor-pointer ${
+                    selectedSize === size
+                      ? "bg-black text-white border-black shadow-sm"
+                      : "bg-white text-zinc-700 border-zinc-200 hover:border-zinc-400"
+                  }`}
+                >
+                  {size}
+                </button>
+              ))}
+            </div>
+          </div>
+        )}
+
+        {/* AVAILABLE COLORS */}
+        {availableColors.length > 0 && (
+          <div className="space-y-2.5">
+            <div className="flex items-center justify-between">
+              <span className="text-xs font-bold text-zinc-500 uppercase tracking-wider">
+                Available Color: <strong className="text-zinc-950 capitalize">{selectedColor || "Select"}</strong>
+              </span>
+            </div>
+            <div className="flex gap-3 flex-wrap">
+              {availableColors.map((color: any) => (
+                <button
+                  key={color}
+                  onClick={() => setSelectedColor(color)}
+                  className={`w-9 h-9 rounded-full border-2 transition-all duration-200 cursor-pointer flex items-center justify-center ${
+                    selectedColor === color
+                      ? "border-black scale-110 ring-2 ring-black/10 shadow-sm"
+                      : "border-zinc-300 hover:scale-105"
+                  }`}
+                  title={color}
+                >
+                  <span 
+                    className="w-7 h-7 rounded-full border border-black/10" 
+                    style={{ backgroundColor: String(color).toLowerCase() }} 
+                  />
+                </button>
+              ))}
+            </div>
+          </div>
+        )}
+
+        {/* QUANTITY & ACTIONS */}
+        <div className="space-y-4 pt-2 border-t border-zinc-200/60">
+          <div className="flex items-center justify-between flex-wrap gap-4">
+            <span className="text-xs font-bold text-zinc-500 uppercase tracking-wider">Quantity</span>
+            <div className="flex items-center border border-zinc-200 bg-white rounded-xl p-1 shadow-2xs">
+              <button
+                disabled={quantity <= 1}
+                onClick={() => setQuantity((q) => Math.max(1, q - 1))}
+                className="bg-zinc-50 border border-zinc-200 rounded-lg p-2 hover:bg-zinc-100 disabled:opacity-30 transition cursor-pointer text-zinc-800"
+                aria-label="Decrease"
+              >
+                <Minus size={13} />
+              </button>
+
+              <span className="font-bold text-xs px-5 text-zinc-900 w-10 text-center">
+                {quantity}
               </span>
 
-              {discountPrice && discountPrice > 0 && (
-                <div className="flex items-center gap-3">
-                  <span className="line-through text-zinc-500 text-base sm:text-lg font-semibold">
-                    {formatPrice(currentPrice)}
-                  </span>
-                  <span className="bg-gradient-to-r from-amber-400 via-amber-300 to-yellow-400 text-zinc-950 font-black text-[11px] px-3 py-1 rounded-lg uppercase tracking-wider shadow-md">
-                    Save {discountPercentage}%
-                  </span>
+              <button
+                disabled={quantity >= currentStock}
+                onClick={() => setQuantity((q) => q + 1)}
+                className="bg-zinc-50 border border-zinc-200 rounded-lg p-2 hover:bg-zinc-100 disabled:opacity-30 transition cursor-pointer text-zinc-800"
+                aria-label="Increase"
+              >
+                <Plus size={13} />
+              </button>
+            </div>
+          </div>
+
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 pt-1">
+            <button
+              disabled={adding || currentStock === 0}
+              onClick={handleAddToCart}
+              className="bg-white border-2 border-black hover:bg-black hover:text-white text-black rounded-xl py-3.5 px-5 font-bold text-xs flex items-center justify-center gap-2 transition-all duration-200 cursor-pointer disabled:opacity-50 shadow-2xs active:scale-98"
+            >
+              <ShoppingCart size={15} />
+              {currentStock === 0 ? "Out Of Stock" : adding ? "Adding..." : "Add To Cart"}
+            </button>
+
+            <button
+              disabled={buyingNow || currentStock === 0}
+              onClick={buyNow}
+              className="bg-black hover:bg-zinc-800 text-white rounded-xl py-3.5 px-5 font-bold text-xs flex items-center justify-center gap-2 transition-all duration-200 cursor-pointer disabled:opacity-50 shadow-md active:scale-98"
+            >
+              <Zap size={15} className="text-amber-400 fill-amber-400" />
+              {buyingNow ? "Processing..." : "Buy Now"}
+            </button>
+          </div>
+        </div>
+
+      </div>
+
+      {/* 4. TABS (DESCRIPTION & SPECIFICATIONS) */}
+      {(productDescription || specsList.length > 0) && (
+        <div className="bg-white border border-zinc-200/80 rounded-3xl p-5 sm:p-6 shadow-2xs space-y-4">
+          
+          {/* Tab Navigation Buttons */}
+          <div className="flex items-center gap-2 p-1 bg-zinc-100 rounded-2xl">
+            {productDescription && (
+              <button
+                onClick={() => setActiveTab("desc")}
+                className={`flex-1 py-2.5 px-4 rounded-xl text-xs font-bold flex items-center justify-center gap-2 transition-all cursor-pointer ${
+                  activeTab === "desc"
+                    ? "bg-white text-black shadow-sm"
+                    : "text-zinc-500 hover:text-zinc-900"
+                }`}
+              >
+                <FileText size={15} /> Description
+              </button>
+            )}
+
+            {specsList.length > 0 && (
+              <button
+                onClick={() => setActiveTab("specs")}
+                className={`flex-1 py-2.5 px-4 rounded-xl text-xs font-bold flex items-center justify-center gap-2 transition-all cursor-pointer ${
+                  activeTab === "specs"
+                    ? "bg-white text-black shadow-sm"
+                    : "text-zinc-500 hover:text-zinc-900"
+                }`}
+              >
+                <Layers size={15} /> Specifications
+              </button>
+            )}
+          </div>
+
+          {/* Tab Content Display */}
+          <div className="pt-2">
+            {activeTab === "desc" && productDescription && (
+              <div className="text-zinc-600 text-xs sm:text-sm leading-relaxed space-y-3 animate-fadeIn">
+                <p className="whitespace-pre-line">{productDescription}</p>
+              </div>
+            )}
+
+            {activeTab === "specs" && specsList.length > 0 && (
+              <div className="space-y-3 animate-fadeIn">
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5">
+                  {specsList.map((item: any, index: number) => (
+                    <div 
+                      key={index} 
+                      className="flex items-center justify-between p-3.5 rounded-xl bg-zinc-50/70 border border-zinc-100 text-xs"
+                    >
+                      <span className="font-medium text-zinc-500">{item.key}</span>
+                      <span className="font-bold text-zinc-900 text-right">{item.value}</span>
+                    </div>
+                  ))}
                 </div>
-              )}
-            </div>
-          </div>
-        </div>
-      </div>
-
-      {/* 4. SIZE SELECTION */}
-      {availableSizes.length > 0 && (
-        <div className="bg-white/90 backdrop-blur-md border border-zinc-200/80 p-5 sm:p-6 rounded-[2rem] shadow-xs space-y-3.5">
-          <div className="flex items-center justify-between">
-            <span className="text-[11px] font-black uppercase tracking-widest text-zinc-400">Select Size</span>
-            <span className="text-xs font-bold text-zinc-900 bg-zinc-100 px-3 py-0.5 rounded-full">{selectedSize}</span>
-          </div>
-          <div className="flex gap-2.5 flex-wrap">
-            {availableSizes.map((size: any) => (
-              <button
-                key={size}
-                onClick={() => setSelectedSize(size)}
-                className={`border px-5 py-3 rounded-2xl text-xs font-extrabold transition-all duration-300 cursor-pointer shadow-xs ${
-                  selectedSize === size
-                    ? "bg-zinc-900 text-white border-zinc-900 shadow-md scale-105 ring-2 ring-zinc-900/20"
-                    : "bg-zinc-50/80 text-zinc-700 border-zinc-200/80 hover:border-zinc-300 hover:bg-zinc-100"
-                }`}
-              >
-                {size}
-              </button>
-            ))}
-          </div>
-        </div>
-      )}
-
-      {/* 5. COLOR SELECTION */}
-      {availableColors.length > 0 && (
-        <div className="bg-white/90 backdrop-blur-md border border-zinc-200/80 p-5 sm:p-6 rounded-[2rem] shadow-xs space-y-3.5">
-          <div className="flex items-center justify-between">
-            <span className="text-[11px] font-black uppercase tracking-widest text-zinc-400">Select Color</span>
-            <span className="text-xs font-bold text-zinc-900 bg-zinc-100 px-3 py-0.5 rounded-full">{selectedColor}</span>
-          </div>
-          <div className="flex gap-3 flex-wrap">
-            {availableColors.map((color: any) => (
-              <button
-                key={color}
-                onClick={() => setSelectedColor(color)}
-                className={`border px-5 py-3 rounded-2xl text-xs font-extrabold transition-all duration-300 cursor-pointer flex items-center gap-2.5 shadow-xs ${
-                  selectedColor === color
-                    ? "bg-zinc-900 text-white border-zinc-900 shadow-md scale-105 ring-2 ring-zinc-900/20"
-                    : "bg-zinc-50/80 text-zinc-700 border-zinc-200/80 hover:border-zinc-300 hover:bg-zinc-100"
-                }`}
-              >
-                <span 
-                  className="w-4 h-4 rounded-full border border-zinc-300 shadow-2xs" 
-                  style={{ backgroundColor: String(color).toLowerCase() }} 
-                />
-                {color}
-              </button>
-            ))}
-          </div>
-        </div>
-      )}
-
-      {/* 6. QUANTITY & DUAL CTA BUTTONS */}
-      <div className="space-y-4 bg-gradient-to-b from-zinc-50/80 to-zinc-100/50 border border-zinc-200/80 p-5 sm:p-7 rounded-[2.5rem] shadow-xs">
-        <div className="flex items-center justify-between flex-wrap gap-4">
-          <span className="text-[11px] font-black text-zinc-400 uppercase tracking-widest">Select Quantity</span>
-          <div className="flex items-center border border-zinc-200/80 bg-white rounded-2xl p-1.5 shadow-xs">
-            <button
-              disabled={quantity <= 1}
-              onClick={() => setQuantity((q) => Math.max(1, q - 1))}
-              className="border border-zinc-100 bg-zinc-50 rounded-xl p-2.5 hover:bg-zinc-100 disabled:opacity-30 transition cursor-pointer text-zinc-800"
-              aria-label="Decrease"
-            >
-              <Minus size={14} />
-            </button>
-
-            <span className="font-black text-sm px-6 text-zinc-950 w-12 text-center">
-              {quantity}
-            </span>
-
-            <button
-              disabled={quantity >= currentStock}
-              onClick={() => setQuantity((q) => q + 1)}
-              className="border border-zinc-100 bg-zinc-50 rounded-xl p-2.5 hover:bg-zinc-100 disabled:opacity-30 transition cursor-pointer text-zinc-800"
-              aria-label="Increase"
-            >
-              <Plus size={14} />
-            </button>
-          </div>
-        </div>
-
-        <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 pt-1">
-          <button
-            disabled={adding || currentStock === 0}
-            onClick={handleAddToCart}
-            className="bg-white border-2 border-zinc-900 hover:bg-zinc-100 text-zinc-950 rounded-2xl py-4 px-6 font-black text-xs sm:text-sm flex items-center justify-center gap-2.5 transition-all duration-300 cursor-pointer disabled:opacity-50 shadow-sm active:scale-98"
-          >
-            <ShoppingCart size={16} />
-            {currentStock === 0 ? "Out Of Stock" : adding ? "Adding..." : "Add To Cart"}
-          </button>
-
-          <button
-            disabled={buyingNow || currentStock === 0}
-            onClick={buyNow}
-            className="bg-gradient-to-r from-zinc-900 via-zinc-900 to-zinc-950 hover:from-black hover:to-zinc-900 text-white rounded-2xl py-4 px-6 font-black text-xs sm:text-sm flex items-center justify-center gap-2.5 transition-all duration-300 cursor-pointer disabled:opacity-50 shadow-xl shadow-zinc-900/20 active:scale-98"
-          >
-            <Zap size={16} className="text-amber-400 fill-amber-400 animate-pulse" />
-            {buyingNow ? "Processing..." : "Buy Now"}
-          </button>
-        </div>
-
-        {/* Mini Trust Badges inside Cart Box */}
-        <div className="grid grid-cols-3 gap-2 pt-3 border-t border-zinc-200/60 text-center">
-          <div className="flex flex-col items-center justify-center p-2 rounded-xl bg-white/60 border border-zinc-200/40">
-            <Truck size={15} className="text-zinc-700 mb-1" />
-            <span className="text-[10px] font-extrabold text-zinc-600">Fast Delivery</span>
-          </div>
-          <div className="flex flex-col items-center justify-center p-2 rounded-xl bg-white/60 border border-zinc-200/40">
-            <ShieldCheck size={15} className="text-zinc-700 mb-1" />
-            <span className="text-[10px] font-extrabold text-zinc-600">Secure Pay</span>
-          </div>
-          <div className="flex flex-col items-center justify-center p-2 rounded-xl bg-white/60 border border-zinc-200/40">
-            <RefreshCw size={15} className="text-zinc-700 mb-1" />
-            <span className="text-[10px] font-extrabold text-zinc-600">Easy Returns</span>
-          </div>
-        </div>
-      </div>
-
-      {/* 7. DESCRIPTION */}
-      {productDescription && (
-        <div className="bg-white/90 backdrop-blur-md border border-zinc-200/80 rounded-[2.5rem] p-6 sm:p-7 shadow-xs space-y-3.5">
-          <h3 className="font-black text-[11px] uppercase tracking-widest text-zinc-400">Description</h3>
-          <div className={`text-zinc-600 text-xs sm:text-sm leading-relaxed font-medium ${!isDescExpanded ? "line-clamp-3" : ""}`}>
-            <p>{productDescription}</p>
-          </div>
-          {productDescription.length > 150 && (
-            <button
-              onClick={() => setIsDescExpanded(!isDescExpanded)}
-              className="text-xs font-extrabold text-zinc-900 hover:underline cursor-pointer pt-1 inline-flex items-center gap-1"
-            >
-              {isDescExpanded ? "Show Less" : "Read Full Description"}
-            </button>
-          )}
-        </div>
-      )}
-
-      {/* 8. ULTRA-PREMIUM MINIMAL SPECIFICATIONS SECTION */}
-      {specsList.length > 0 && (
-        <div className="bg-gradient-to-br from-white via-zinc-50/40 to-white border border-zinc-200/90 rounded-[2.5rem] p-6 sm:p-8 shadow-sm space-y-5">
-          <button
-            onClick={() => setIsSpecsOpen(!isSpecsOpen)}
-            className="w-full flex items-center justify-between text-left cursor-pointer group"
-          >
-            <div className="flex items-center gap-4">
-              <div className="p-3.5 rounded-2xl bg-gradient-to-br from-zinc-900 to-zinc-950 text-white shadow-md group-hover:scale-105 transition-transform duration-300">
-                <SlidersHorizontal size={18} />
               </div>
-              <div>
-                <h3 className="font-black text-sm sm:text-base text-zinc-950 tracking-tight">Specifications</h3>
-                <p className="text-xs text-zinc-400 font-semibold mt-0.5">Explore key product metrics and details</p>
-              </div>
-            </div>
-            <div className="p-3 rounded-2xl bg-white border border-zinc-200/80 group-hover:bg-zinc-100 transition text-zinc-700 shadow-xs">
-              {isSpecsOpen ? <ChevronUp size={15} /> : <ChevronDown size={15} />}
-            </div>
-          </button>
+            )}
+          </div>
 
-          {isSpecsOpen && (
-            <div className="space-y-4 pt-4 border-t border-zinc-100/90">
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3.5">
-                {displayedSpecs.map((item: any, index: number) => (
-                  <div 
-                    key={index} 
-                    className="flex items-center justify-between p-4 rounded-2xl bg-white border border-zinc-200/80 hover:border-zinc-300 hover:shadow-sm transition-all duration-300 group/card"
-                  >
-                    <span className="text-xs font-bold text-zinc-400 group-hover/card:text-zinc-600 transition-colors">{item.key}</span>
-                    <span className="text-xs sm:text-sm font-black text-zinc-900 text-right">{item.value}</span>
-                  </div>
-                ))}
-              </div>
-
-              {specsList.length > 4 && (
-                <button
-                  onClick={() => setShowAllSpecs(!showAllSpecs)}
-                  className="w-full py-4 bg-zinc-900 hover:bg-black text-white rounded-2xl text-xs font-black transition-all duration-300 flex items-center justify-center gap-2 cursor-pointer shadow-md shadow-zinc-900/10 active:scale-98"
-                >
-                  {showAllSpecs ? (
-                    <>Show Less <ChevronUp size={14} /></>
-                  ) : (
-                    <>Show All {specsList.length} Specifications <ChevronDown size={14} /></>
-                  )}
-                </button>
-              )}
-            </div>
-          )}
         </div>
       )}
+
     </div>
   );
 }
