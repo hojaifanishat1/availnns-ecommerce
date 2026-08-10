@@ -10,6 +10,7 @@ import {
 import { DefaultVariant } from "@/constants/variants";
 
 interface Props {
+  attributeLabel?: string; // ১. প্রপসটি এখানে রিসিভ করার জন্য ডিফাইন করা হলো
   onGenerate: (
     variants: DefaultVariant[]
   ) => void;
@@ -33,10 +34,11 @@ const getColorHex = (colorName: string): string => {
     navy: "#1E3A8A",
     brown: "#92400E",
   };
-  return hexMap[name] || "#000000"; // ম্যাচ না করলে ডিফল্ট ব্ল্যাক
+  return hexMap[name] || "#000000";
 };
 
 export default function VariantGenerator({
+  attributeLabel = "Size",
   onGenerate
 }: Props) {
   const [
@@ -48,6 +50,21 @@ export default function VariantGenerator({
     colors,
     setColors
   ] = useState("");
+
+  // ২. ক্যাটেগরি অনুযায়ী জেনারেটরের লেবেল ডায়নামিক করার লজিক
+  const getAttributeTitle = () => {
+    if (attributeLabel.includes("RAM")) return "RAM & Storage (comma-separated)";
+    if (attributeLabel.includes("Dial")) return "Dial / Strap Size (comma-separated)";
+    if (attributeLabel.includes("Specification")) return "Specification / Type (comma-separated)";
+    return "Sizes (comma-separated)";
+  };
+
+  const getPlaceholder = () => {
+    if (attributeLabel.includes("RAM")) return "8GB/128GB, 12GB/256GB";
+    if (attributeLabel.includes("Dial")) return "40mm, 44mm";
+    if (attributeLabel.includes("Specification")) return "Standard, Pro";
+    return "S, M, L, XL";
+  };
 
   const generate = () => {
     const sizeList =
@@ -77,7 +94,7 @@ export default function VariantGenerator({
             sku: `${size}-${color}`.toUpperCase(),
             size,
             color,
-            colorHex: getColorHex(color), // এখানে প্রতিটি কালারের সঠিক হেক্স কোড সেট করা হলো
+            colorHex: getColorHex(color),
             stock: 0,
             price: 0,
             discountPrice: 0,
@@ -106,7 +123,7 @@ export default function VariantGenerator({
           sku: color.toUpperCase(),
           size: "",
           color,
-          colorHex: getColorHex(color), // এখানেও সঠিক হেক্স কোড দেওয়া হলো
+          colorHex: getColorHex(color),
           stock: 0,
           price: 0,
           discountPrice: 0,
@@ -137,7 +154,7 @@ export default function VariantGenerator({
       <div className="space-y-3">
         <div>
           <label className="block text-xs font-medium text-gray-700 mb-1">
-            Sizes (comma-separated)
+            {getAttributeTitle()}
           </label>
           <input
             type="text"
@@ -152,7 +169,7 @@ export default function VariantGenerator({
               focus:ring-2
               focus:ring-black
             "
-            placeholder="S, M, L, XL"
+            placeholder={getPlaceholder()}
             value={sizes}
             onChange={(e) =>
               setSizes(e.target.value)

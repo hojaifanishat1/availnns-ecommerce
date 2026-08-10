@@ -11,6 +11,7 @@ import ShopSidebar from "@/components/shop/ShopSidebar";
 interface CategoryItem {
   _id: string;
   name: string;
+  slug?: string;
   children?: CategoryItem[];
 }
 
@@ -67,35 +68,40 @@ export default function ShopPage() {
   };
 
   // ===============================
-  // HELPER: GET ALL SUB-CATEGORY IDs
+  // HELPER: GET ALL CATEGORY & SUB-CATEGORY IDs/SLUGS (RECURSIVE)
   // ===============================
   const getAllCategoryIds = (catId: string, items: CategoryItem[]): string[] => {
     let ids: string[] = [catId];
 
-    for (const item of items) {
-      if (item._id === catId) {
-        if (item.children && item.children.length > 0) {
-          const collectChildrenIds = (children: CategoryItem[]) => {
+    const searchTree = (categories: CategoryItem[]) => {
+      for (const item of categories) {
+        if (item._id === catId || item.slug === catId || item.name?.toLowerCase() === catId.toLowerCase()) {
+          ids.push(item._id);
+          if (item.slug) ids.push(item.slug);
+
+          const collectChildren = (children: CategoryItem[]) => {
             for (const child of children) {
-              ids.push(child._id);
+              if (child._id) ids.push(child._id);
+              if (child.slug) ids.push(child.slug);
               if (child.children && child.children.length > 0) {
-                collectChildrenIds(child.children);
+                collectChildren(child.children);
               }
             }
           };
-          collectChildrenIds(item.children);
-        }
-        break;
-      } else if (item.children && item.children.length > 0) {
-        const foundIds = getAllCategoryIds(catId, item.children);
-        if (foundIds.length > 1 || foundIds.includes(catId)) {
-          ids = foundIds;
+
+          if (item.children && item.children.length > 0) {
+            collectChildren(item.children);
+          }
           break;
         }
+        if (item.children && item.children.length > 0) {
+          searchTree(item.children);
+        }
       }
-    }
+    };
 
-    return ids;
+    searchTree(items);
+    return Array.from(new Set(ids)); // Unique IDs/Slugs return korbe
   };
 
   // ===============================
@@ -105,13 +111,21 @@ export default function ShopPage() {
     let categoryMatch = true;
 
     if (category !== "all") {
-      const productCatId =
-        typeof product.category === "object"
-          ? product.category?._id
+      const productCat = 
+        typeof product.category === "object" && product.category !== null
+          ? product.category._id || product.category.id || product.category.slug || product.category.name
           : product.category;
 
+      const productSubCat = 
+        typeof product.subCategory === "object" && product.subCategory !== null
+          ? product.subCategory._id || product.subCategory.id || product.subCategory.slug || product.subCategory.name
+          : product.subCategory;
+
       const validCategoryIds = getAllCategoryIds(category, categoryTree);
-      categoryMatch = validCategoryIds.includes(productCatId);
+      
+      categoryMatch = 
+        (productCat && validCategoryIds.includes(productCat)) || 
+        (productSubCat && validCategoryIds.includes(productSubCat));
     }
 
     const priceMatch =
@@ -228,42 +242,54 @@ export default function ShopPage() {
               </div>
             )}
 
-            {/* IF "ALL" IS SELECTED: SHOW PRODUCTS GROUPED BY CATEGORY SECTIONS */}
+            {/* IF "ALL" IS SELECTED: SHOW PRODUCTS GROUPED BY CATEGORY SECTIONS (ALL PRODUCTS) */}
             {!loading && sortedProducts.length > 0 && category === "all" && (
-              categoryTree.map((cat) => {
-                const catProducts = sortedProducts.filter((product) => {
-                  const productCatId =
-                    typeof product.category === "object"
-                      ? product.category?._id
-                      : product.category;
+              <div className="space-y-16">
+                {categoryTree.map((cat) => {
                   const validCategoryIds = getAllCategoryIds(cat._id, categoryTree);
-                  return validCategoryIds.includes(productCatId);
-                });
+                  
+                  const catProducts = sortedProducts.filter((product) => {
+                    const productCat =
+                      typeof product.category === "object" && product.category !== null
+                        ? product.category._id || product.category.id || product.category.slug || product.category.name
+                        : product.category;
 
-                if (catProducts.length === 0) return null;
+                    const productSubCat =
+                      typeof product.subCategory === "object" && product.subCategory !== null
+                        ? product.subCategory._id || product.subCategory.id || product.subCategory.slug || product.subCategory.name
+                        : product.subCategory;
 
-                return (
-                  <div key={cat._id} className="space-y-4">
-                    <div className="flex items-center justify-between border-b border-zinc-200 pb-3">
-                      <h2 className="text-xl font-extrabold text-zinc-900 tracking-tight">
-                        {cat.name}
-                      </h2>
-                      <button
-                        onClick={() => setCategory(cat._id)}
-                        className="text-xs font-bold text-zinc-600 hover:text-black transition flex items-center gap-1 cursor-pointer"
-                      >
-                        View All <ArrowRight size={13} />
-                      </button>
+                    return (
+                      (productCat && validCategoryIds.includes(productCat)) ||
+                      (productSubCat && validCategoryIds.includes(productSubCat))
+                    );
+                  });
+
+                  if (catProducts.length === 0) return null;
+
+                  return (
+                    <div key={cat._id} className="space-y-6">
+                      <div className="flex items-center justify-between border-b border-zinc-200 pb-3">
+                        <h2 className="text-2xl font-black text-zinc-900 tracking-tight capitalize">
+                          {cat.name}
+                        </h2>
+                        <button
+                          onClick={() => setCategory(cat._id)}
+                          className="text-xs font-bold text-zinc-600 hover:text-black transition flex items-center gap-1 cursor-pointer"
+                        >
+                          View All {cat.name} <ArrowRight size={13} />
+                        </button>
+                      </div>
+
+                      <div className="grid grid-cols-2 gap-4 sm:gap-6 sm:grid-cols-3">
+                        {catProducts.map((product) => (
+                          <ProductCard key={product._id} product={product} />
+                        ))}
+                      </div>
                     </div>
-
-                    <div className="grid grid-cols-2 gap-4 sm:gap-6 sm:grid-cols-3">
-                      {catProducts.slice(0, 3).map((product) => (
-                        <ProductCard key={product._id} product={product} />
-                      ))}
-                    </div>
-                  </div>
-                );
-              })
+                  );
+                })}
+              </div>
             )}
 
             {/* IF A SPECIFIC CATEGORY IS SELECTED: SHOW STANDARD GRID */}

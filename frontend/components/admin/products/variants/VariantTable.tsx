@@ -1,11 +1,11 @@
 "use client";
 
-import VariantRow
-from "./VariantRow";
+import VariantRow from "./VariantRow";
 import { DefaultVariant } from "@/constants/variants";
 
 interface Props {
   variants: DefaultVariant[];
+  attributeLabel?: string; // এটি যোগ করা হয়েছে
   onChange: (
     index: number,
     key: string,
@@ -16,6 +16,7 @@ interface Props {
 
 export default function VariantTable({
   variants,
+  attributeLabel = "Size", // ডিফল্ট ভ্যালু
   onChange,
   onDelete
 }: Props) {
@@ -36,6 +37,7 @@ export default function VariantTable({
               key={index}
               variant={variant}
               index={index}
+              attributeLabel={attributeLabel} // এখানে attributeLabel পাস করা হলো
               onChange={onChange}
               onDelete={onDelete}
             />

@@ -33,7 +33,7 @@ export const DEFAULT_PRODUCT_FORM: ProductForm = {
 
     discountPrice: 0,
 
-    currency: "SAR",
+    currency: "BDT",
 
     discountStartDate: "",
 

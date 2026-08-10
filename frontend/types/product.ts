@@ -50,6 +50,11 @@ export interface ProductFlags {
 export interface ProductPricing {
   price: number;
   discountPrice?: number;
+  currency?: string; // 👈 এটি এখানে যুক্ত করা হয়েছে
+  discountStartDate?: string;
+  discountEndDate?: string;
+  costPerItem?: number;
+  taxable?: boolean;
   stock?: number;
   lowStockThreshold?: number;
 }
@@ -116,7 +121,7 @@ export interface Product {
   updatedAt?: string | Date;
 
   // Fallbacks for older structure if needed
-  pricing?: { price: number; discountPrice?: number };
+  pricing?: { price: number; discountPrice?: number; currency?: string };
   inventory?: { stock: number; lowStockThreshold?: number };
   flags?: { isBestSeller?: boolean; isNewArrival?: boolean };
 }

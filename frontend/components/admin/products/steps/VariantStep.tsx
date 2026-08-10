@@ -18,8 +18,74 @@ export default function VariantStep() {
     updateField
   } = useProductFormContext();
 
-  // টাইপ এরর এড়াতে টাইপ অ্যাসার্শন ব্যবহার করা হয়েছে
   const variants: DefaultVariant[] = (form.variants as DefaultVariant[]) || [];
+
+  // ক্যাটেগরি, সাব-ক্যাটেগরি এবং ডাইনামিক categoryFields একসাথে স্ক্যান করে নিখুঁত লেবেল বের করার লজিক
+  const getVariantAttributeLabel = () => {
+    const parseField = (field: unknown): string => {
+      if (!field) return "";
+      if (typeof field === "string") return field;
+      if (typeof field === "object" && field !== null) {
+        const obj = field as Record<string, unknown>;
+        return String(obj.name || obj.title || obj.slug || obj.label || JSON.stringify(obj));
+      }
+      return String(field);
+    };
+
+    const catName = parseField(form.category).toLowerCase();
+    const subCatName = parseField(form.subCategory).toLowerCase();
+    
+    // categoryFields অবজেক্টের ভেতরের কি বা ভ্যালুগুলো স্ট্রিং এ রূপান্তর করে চেক করা
+    const categoryFieldsStr = form.categoryFields 
+      ? Object.entries(form.categoryFields)
+          .map(([k, v]) => `${k} ${String(v)}`)
+          .join(" ")
+          .toLowerCase()
+      : "";
+
+    const combinedCategory = `${catName} ${subCatName} ${categoryFieldsStr}`;
+
+    if (
+      combinedCategory.includes("ram") ||
+      combinedCategory.includes("storage") ||
+      combinedCategory.includes("mobile") ||
+      combinedCategory.includes("phone") ||
+      combinedCategory.includes("smartphone") ||
+      combinedCategory.includes("laptop") ||
+      combinedCategory.includes("electronic") ||
+      combinedCategory.includes("computer") ||
+      combinedCategory.includes("gadget") ||
+      combinedCategory.includes("device") ||
+      combinedCategory.includes("tablet")
+    ) {
+      return "RAM & Storage";
+    } 
+    
+    if (
+      combinedCategory.includes("watch") ||
+      combinedCategory.includes("band") ||
+      combinedCategory.includes("dial")
+    ) {
+      return "Dial / Strap";
+    } 
+    
+    if (
+      combinedCategory.includes("accessory") ||
+      combinedCategory.includes("accessories") ||
+      combinedCategory.includes("charger") ||
+      combinedCategory.includes("cover")
+    ) {
+      return "Specification";
+    }
+
+    if (catName && catName.trim() !== "" && !catName.startsWith("cat_")) {
+      return catName;
+    }
+
+    return "Size";
+  };
+
+  const attributeLabel = getVariantAttributeLabel();
 
   // ভেরিয়েন্টের স্টক পরিবর্তন হলে অটো মোট স্টক আপডেট করার লজিক
   useEffect(() => {
@@ -94,7 +160,6 @@ export default function VariantStep() {
     const basePrice = form.pricing?.price || 0;
     
     const variantsWithDefaults: DefaultVariant[] = generatedVariants.map((v) => {
-      // কালার অবজেক্ট বা স্ট্রিং থেকে সঠিক নাম ও হেক্স কোড বের করার লজিক
       let colorName = "";
       let colorHex = "#000000";
 
@@ -116,6 +181,7 @@ export default function VariantStep() {
 
       return {
         ...v,
+        size: v.size || "",
         color: colorName || v.color || "",
         colorHex: v.colorHex || colorHex,
         price: v.price || basePrice,
@@ -137,7 +203,7 @@ export default function VariantStep() {
             Product Variants
           </h2>
           <p className="text-sm text-gray-500">
-            Add size, color, stock, and pricing variations. Generate combinations quickly or create them manually.
+            Add variations for {attributeLabel}, color, stock, and pricing. Generate combinations quickly or create them manually.
           </p>
         </div>
 
@@ -158,6 +224,7 @@ export default function VariantStep() {
             gap-2
             hover:bg-gray-800
             transition-colors
+            cursor-pointer
           "
         >
           <Plus size={16} />
@@ -165,22 +232,31 @@ export default function VariantStep() {
         </button>
       </div>
 
-      <VariantGenerator onGenerate={handleGenerate} />
+      <VariantGenerator 
+        attributeLabel={attributeLabel} 
+        onGenerate={handleGenerate} 
+      />
 
       <div className="bg-white border rounded-xl p-5 shadow-sm space-y-4">
-        <h3 className="font-semibold text-gray-900">
-          Current Variants ({variants.length})
-        </h3>
+        <div className="flex justify-between items-center">
+          <h3 className="font-semibold text-gray-900">
+            Current Variants ({variants.length})
+          </h3>
+          <span className="text-xs bg-gray-100 text-gray-700 font-medium px-2.5 py-1 rounded-md">
+            Active Attribute: <strong className="text-black">{attributeLabel}</strong>
+          </span>
+        </div>
 
         {variants.length > 0 ? (
           <div className="overflow-x-auto">
-            <VariantTableHeader />
+            <VariantTableHeader attributeLabel={attributeLabel} />
             <div className="divide-y divide-gray-100 mt-2">
               {variants.map((variant, index) => (
                 <VariantTableRow
                   key={index}
                   variant={variant}
                   index={index}
+                  attributeLabel={attributeLabel}
                   onChange={updateVariant}
                   onDelete={removeVariant}
                 />

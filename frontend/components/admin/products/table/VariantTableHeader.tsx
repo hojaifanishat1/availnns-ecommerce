@@ -1,9 +1,20 @@
 "use client";
 
-export default function VariantTableHeader() {
+interface VariantTableHeaderProps {
+  attributeLabel?: string;
+}
+
+export default function VariantTableHeader({ attributeLabel = "Size" }: VariantTableHeaderProps) {
+  const getHeaderTitle = () => {
+    if (attributeLabel.includes("RAM")) return "RAM & Storage";
+    if (attributeLabel.includes("Dial")) return "Dial / Strap";
+    if (attributeLabel.includes("Specification")) return "Specification";
+    return "Size";
+  };
+
   const headers = [
     "SKU",
-    "Size",
+    getHeaderTitle(),
     "Color",
     "Stock",
     "Price",

@@ -8,6 +8,7 @@ import { DefaultVariant } from "@/constants/variants";
 interface Props {
   variant: DefaultVariant;
   index: number;
+  attributeLabel?: string;
   onChange: (
     index: number,
     key: string,
@@ -21,9 +22,18 @@ interface Props {
 export default function VariantTableRow({
   variant,
   index,
+  attributeLabel = "Size",
   onChange,
   onDelete
 }: Props) {
+  // ক্যাটেগরি অনুযায়ী ইনপুটের প্লেসহোল্ডার ডায়নামিক করার লজিক
+  const getPlaceholder = () => {
+    if (attributeLabel.includes("RAM")) return "RAM & Storage (e.g., 8GB/128GB)";
+    if (attributeLabel.includes("Dial")) return "Dial / Strap";
+    if (attributeLabel.includes("Specification")) return "Specification";
+    return "Size (e.g., S, M, L)";
+  };
+
   return (
     <div
       className="
@@ -63,7 +73,7 @@ export default function VariantTableRow({
 
       <input
         type="text"
-        placeholder="Size"
+        placeholder={getPlaceholder()}
         value={variant.size || ""}
         onChange={(e) =>
           onChange(

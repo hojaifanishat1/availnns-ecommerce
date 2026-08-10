@@ -73,8 +73,8 @@ export const createProduct = async (req: Request, res: Response): Promise<void> 
 
     const productData: any = {
       ...req.body,
-      category: req.body.subCategory || req.body.category || "",
-      subCategory: req.body.subCategory || null,
+      category: req.body.category || "",          // Main Category ID
+      subCategory: req.body.subCategory || null,  // Sub-Category ID (Separated safely)
       slug,
       images,
       isPublished: true,
@@ -208,8 +208,8 @@ export const updateProduct = async (req: Request, res: Response): Promise<void> 
 
     const data: any = { 
       ...req.body, 
-      category: req.body.subCategory || req.body.category || product.category,
-      subCategory: req.body.subCategory || product.subCategory || null 
+      category: req.body.category || product.category,          // Main Category ID
+      subCategory: req.body.subCategory || product.subCategory || null // Sub-Category ID
     };
 
     if (req.body.oldImages) {
