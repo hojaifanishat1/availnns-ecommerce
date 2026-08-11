@@ -37,33 +37,73 @@ export default function OrderSummary({
 
       {/* ITEMS LIST */}
       <div className="space-y-5 max-h-[420px] overflow-y-auto">
-        {items.map((item: any) => (
-          <div key={item._id} className="flex gap-4 border-b pb-4">
-            <div className="h-16 w-16 overflow-hidden rounded-xl bg-zinc-100 shrink-0">
-              {item.product?.images?.[0]?.url && (
-                <img
-                  src={item.product.images[0].url}
-                  alt={item.product.name}
-                  className="h-full w-full object-cover"
-                />
-              )}
-            </div>
+        {items.map((item: any) => {
+          // কার্ট আইটেমের মতো শক্তিশালী ফলব্যাক দিয়ে সাইজ ও কালার এক্সট্রাক্ট করা
+          const product = typeof item?.product === "object" && item?.product !== null ? item.product : {};
+          
+          const selectedSize = 
+            item?.selectedSize || 
+            item?.size || 
+            item?.variantSize || 
+            product?.selectedSize || 
+            product?.size || 
+            product?.capacity || 
+            product?.storage ||
+            "";
 
-            <div className="flex-1">
-              <h3 className="text-sm font-semibold line-clamp-2">
-                {item.product?.name}
-              </h3>
-              <p className="mt-1 text-sm text-zinc-500">
-                Qty: {item.quantity}
-              </p>
-            </div>
+          const selectedColor = 
+            item?.selectedColor || 
+            item?.color || 
+            item?.variantColor || 
+            product?.selectedColor || 
+            product?.color || 
+            "";
 
-            {/* প্রতিটি আইটেমের মোট প্রাইস */}
-            <div className="font-semibold">
-              {formatPrice(item.price * item.quantity)}
+          return (
+            <div key={item._id || item.product} className="flex gap-4 border-b pb-4">
+              <div className="h-16 w-16 overflow-hidden rounded-xl bg-zinc-100 shrink-0">
+                {item.product?.images?.[0]?.url && (
+                  <img
+                    src={item.product.images[0].url}
+                    alt={item.product.name}
+                    className="h-full w-full object-cover"
+                  />
+                )}
+              </div>
+
+              <div className="flex-1 min-w-0">
+                <h3 className="text-sm font-semibold line-clamp-2">
+                  {item.product?.name || item.name}
+                </h3>
+
+                {/* সিলেক্ট করা ভ্যারিয়েন্ট (সাইজ ও কালার) */}
+                {(selectedSize || selectedColor) && (
+                  <div className="flex items-center gap-2.5 text-[11px] text-zinc-500 font-medium mt-1">
+                    {selectedSize && (
+                      <span>
+                        Size: <strong className="text-zinc-800">{selectedSize}</strong>
+                      </span>
+                    )}
+                    {selectedColor && (
+                      <span>
+                        Color: <strong className="text-zinc-800 capitalize">{selectedColor}</strong>
+                      </span>
+                    )}
+                  </div>
+                )}
+
+                <p className="mt-1 text-xs text-zinc-500">
+                  Qty: {item.quantity}
+                </p>
+              </div>
+
+              {/* প্রতিটি আইটেমের মোট প্রাইস */}
+              <div className="font-semibold text-sm shrink-0">
+                {formatPrice(item.price * item.quantity)}
+              </div>
             </div>
-          </div>
-        ))}
+          );
+        })}
       </div>
 
       {/* PRICE BREAKDOWN */}
@@ -103,7 +143,7 @@ export default function OrderSummary({
 
       <button
         disabled={loading}
-        className="w-full rounded-2xl bg-black py-4 font-bold text-white transition hover:bg-zinc-800 disabled:opacity-50"
+        className="w-full rounded-2xl bg-black py-4 font-bold text-white transition hover:bg-zinc-800 disabled:opacity-50 cursor-pointer"
       >
         {loading ? (
           <div className="flex items-center justify-center gap-2">

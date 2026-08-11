@@ -545,37 +545,77 @@ export default function CheckoutPage() {
               </h2>
 
               <div className="space-y-4 max-h-[280px] overflow-y-auto pr-1">
-                {items.map((item: any) => (
-                  <div
-                    key={item._id}
-                    className="flex gap-3.5 border-b border-zinc-100 pb-3.5 last:border-0"
-                  >
-                    <div className="h-16 w-16 overflow-hidden rounded-xl bg-zinc-100 shrink-0 border border-zinc-100">
-                      <img
-                        src={
-                          item?.product?.images?.[0]?.url ||
-                          item?.product?.images?.[0] ||
-                          "/placeholder.png"
-                        }
-                        alt={item?.product?.name || "Product"}
-                        className="h-full w-full object-cover"
-                      />
-                    </div>
-                    <div className="flex-1 min-w-0">
-                      <h3 className="font-bold text-xs line-clamp-2 text-zinc-900">
-                        {item.product?.name}
-                      </h3>
-                      <div className="mt-1.5 flex justify-between text-xs text-zinc-500 font-medium">
-                        <span>Qty: {item.quantity}</span>
-                        <span className="text-zinc-900 font-bold">
-                          {formatPrice(
-                            (item.product?.discountPrice || item.product?.price || item.price) * item.quantity
-                          )}
-                        </span>
+                {items.map((item: any) => {
+                  const product = typeof item?.product === "object" && item?.product !== null ? item.product : {};
+                  
+                  const selectedSize = 
+                    item?.selectedSize || 
+                    item?.size || 
+                    item?.variantSize || 
+                    product?.selectedSize || 
+                    product?.size || 
+                    product?.capacity || 
+                    product?.storage ||
+                    "";
+
+                  const selectedColor = 
+                    item?.selectedColor || 
+                    item?.color || 
+                    item?.variantColor || 
+                    product?.selectedColor || 
+                    product?.color || 
+                    "";
+
+                  return (
+                    <div
+                      key={item._id || item.product}
+                      className="flex gap-3.5 border-b border-zinc-100 pb-3.5 last:border-0"
+                    >
+                      <div className="h-16 w-16 overflow-hidden rounded-xl bg-zinc-100 shrink-0 border border-zinc-100">
+                        <img
+                          src={
+                            item?.product?.images?.[0]?.url ||
+                            item?.product?.images?.[0] ||
+                            item?.image ||
+                            "/placeholder.png"
+                          }
+                          alt={item?.product?.name || item?.name || "Product"}
+                          className="h-full w-full object-cover"
+                        />
+                      </div>
+                      <div className="flex-1 min-w-0">
+                        <h3 className="font-bold text-xs line-clamp-2 text-zinc-900">
+                          {item.product?.name || item.name}
+                        </h3>
+
+                        {/* সিলেক্ট করা ভ্যারিয়েন্ট (সাইজ ও কালার) */}
+                        {(selectedSize || selectedColor) && (
+                          <div className="flex items-center gap-2 text-[11px] text-zinc-500 font-medium mt-1">
+                            {selectedSize && (
+                              <span>
+                                Size: <strong className="text-zinc-800">{selectedSize}</strong>
+                              </span>
+                            )}
+                            {selectedColor && (
+                              <span>
+                                Color: <strong className="text-zinc-800 capitalize">{selectedColor}</strong>
+                              </span>
+                            )}
+                          </div>
+                        )}
+
+                        <div className="mt-1.5 flex justify-between text-xs text-zinc-500 font-medium">
+                          <span>Qty: {item.quantity}</span>
+                          <span className="text-zinc-900 font-bold">
+                            {formatPrice(
+                              (item.product?.discountPrice || item.product?.price || item.price) * item.quantity
+                            )}
+                          </span>
+                        </div>
                       </div>
                     </div>
-                  </div>
-                ))}
+                  );
+                })}
               </div>
 
               <div className="space-y-2 pt-3 border-t border-zinc-100 text-xs text-zinc-600">
@@ -615,7 +655,7 @@ export default function CheckoutPage() {
               <button
                 type="button"
                 onClick={continuePayment}
-                className="w-full rounded-xl bg-zinc-900 py-4 text-xs font-bold text-white transition-all hover:bg-zinc-800 shadow-md flex items-center justify-center gap-2 active:scale-[0.99]"
+                className="w-full rounded-xl bg-zinc-900 py-4 text-xs font-bold text-white transition-all hover:bg-zinc-800 shadow-md flex items-center justify-center gap-2 active:scale-[0.99] cursor-pointer"
               >
                 <span>Continue to Payment</span>
                 <ArrowRight size={15} />

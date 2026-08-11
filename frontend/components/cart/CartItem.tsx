@@ -1,7 +1,6 @@
 "use client";
 
 import Image from "next/image";
-
 import {
   Minus,
   Plus,
@@ -10,23 +9,18 @@ import {
   Truck,
   CheckCircle2,
 } from "lucide-react";
-
 import useCart from "@/hooks/useCart";
-
-import {
-  useWishlist
-} from "@/context/WishlistContext";
-
-import {
-  useCurrency
-} from "@/context/CurrencyContext";
+import { useWishlist } from "@/context/WishlistContext";
+import { useCurrency } from "@/context/CurrencyContext";
 
 type Props = {
   item: any;
+  maxStock?: any;
 };
 
 export default function CartItem({
-  item
+  item,
+  maxStock
 }: Props) {
 
   const {
@@ -44,7 +38,7 @@ export default function CartItem({
   } = useCurrency();
 
   // =======================
-  // PRODUCT (Fixed ID extraction)
+  // PRODUCT & VARIANT EXTRACTION
   // =======================
   const product =
     typeof item?.product === "object" && item?.product !== null ? item.product : {};
@@ -56,9 +50,35 @@ export default function CartItem({
 
   const name =
     product?.name ||
+    item?.name ||
     "Product";
 
+  // শক্তিশালী ফলব্যাক দিয়ে সাইজ ও কালার এক্সট্রাক্ট করা (যাতে সব ধরনের API স্ট্রাকচার সাপোর্ট করে)
+  const selectedSize = 
+    item?.selectedSize || 
+    item?.size || 
+    item?.variantSize || 
+    product?.selectedSize || 
+    product?.size || 
+    product?.capacity || 
+    product?.storage ||
+    item?.attributes?.size ||
+    product?.attributes?.size ||
+    "";
+
+  const selectedColor = 
+    item?.selectedColor || 
+    item?.color || 
+    item?.variantColor || 
+    product?.selectedColor || 
+    product?.color || 
+    item?.attributes?.color ||
+    product?.attributes?.color ||
+    "";
+  
   const stock =
+    maxStock ??
+    item?.stock ??
     product?.stock ??
     999;
 
@@ -77,13 +97,13 @@ export default function CartItem({
   const image =
     product?.images?.[0]?.url ||
     product?.images?.[0] ||
+    item?.image ||
     "/placeholder.png";
 
   // =======================
   // REMOVE HELPER (LocalStorage Sync)
   // =======================
   const handleRemoveItem = async () => {
-    // লোকালস্টোরেজে রিমুভ করা প্রোডাক্ট সেভ করা
     localStorage.setItem(
       "last_removed_cart_item",
       JSON.stringify({
@@ -94,10 +114,7 @@ export default function CartItem({
       })
     );
 
-    // কার্ট পেজকে ইনস্ট্যান্ট আপডেট করার জন্য ইভেন্ট ফায়ার করা
     window.dispatchEvent(new Event("cartItemRemoved"));
-
-    // মূল রিমুভ ফাংশন কল করা
     await removeItem(productId);
   };
 
@@ -236,6 +253,22 @@ export default function CartItem({
                 {name}
               </h3>
 
+              {/* সিলেক্ট করা ভ্যারিয়েন্ট (সাইজ ও কালার) রেন্ডার করার অংশ */}
+              {(selectedSize || selectedColor) && (
+                <div className="flex items-center gap-3 text-xs text-zinc-500 font-medium mt-1">
+                  {selectedSize && (
+                    <span>
+                      Size: <strong className="text-zinc-800">{selectedSize}</strong>
+                    </span>
+                  )}
+                  {selectedColor && (
+                    <span>
+                      Color: <strong className="text-zinc-800 capitalize">{selectedColor}</strong>
+                    </span>
+                  )}
+                </div>
+              )}
+
               <p
                 className="
                   mt-1
@@ -273,7 +306,7 @@ export default function CartItem({
                     "
                   >
                     <CheckCircle2 size={15} />
-                    In Stock
+                    In Stock ({stock} available)
                   </p>
                 )
                 :

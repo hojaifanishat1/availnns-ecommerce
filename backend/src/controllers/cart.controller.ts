@@ -13,15 +13,21 @@ const normalizeCartItems = (items: any[] = []) => {
 
     if (!productId) return;
 
+    const size = item.size || "";
+    const color = item.color || "";
+    const compositeKey = `${productId}_${size}_${color}`;
+
     const quantity = Number(item.quantity || 1);
 
-    if (mergedMap.has(productId)) {
-      const existing = mergedMap.get(productId);
+    if (mergedMap.has(compositeKey)) {
+      const existing = mergedMap.get(compositeKey);
       existing.quantity += quantity;
     } else {
-      mergedMap.set(productId, {
+      mergedMap.set(compositeKey, {
         ...item,
         product: rawProduct,
+        size,
+        color,
         quantity,
       });
     }
@@ -74,7 +80,7 @@ export const getCart = async (req: Request, res: Response): Promise<void> => {
 export const addToCart = async (req: Request, res: Response): Promise<void> => {
   try {
     const userId = (req as any).user.id;
-    const { productId, quantity } = req.body;
+    const { productId, quantity, size, color } = req.body;
 
     const addQuantity = Number(quantity || 1);
 
@@ -116,10 +122,15 @@ export const addToCart = async (req: Request, res: Response): Promise<void> => {
 
     const price = product.discountPrice && product.discountPrice > 0 ? product.discountPrice : product.price;
 
-    // Fixed: Checking both populated product object and raw id string
+    const itemSize = size || "";
+    const itemColor = color || "";
+
     const existingItem: any = cart.items.find((item: any) => {
       const itemProdId = item.product?._id ? item.product._id.toString() : item.product?.toString();
-      return itemProdId === String(productId);
+      const sameProduct = itemProdId === String(productId);
+      const sameSize = (item.size || "") === itemSize;
+      const sameColor = (item.color || "") === itemColor;
+      return sameProduct && sameSize && sameColor;
     });
 
     if (existingItem) {
@@ -130,6 +141,8 @@ export const addToCart = async (req: Request, res: Response): Promise<void> => {
         product: product._id,
         quantity: addQuantity,
         price,
+        size: itemSize,
+        color: itemColor,
       } as any);
     }
 
@@ -164,7 +177,7 @@ export const addToCart = async (req: Request, res: Response): Promise<void> => {
 export const updateCartItem = async (req: Request, res: Response): Promise<void> => {
   try {
     const userId = (req as any).user.id;
-    const { productId, quantity } = req.body;
+    const { productId, quantity, size, color } = req.body;
 
     const cart = await Cart.findOne({ user: userId });
 
@@ -176,9 +189,15 @@ export const updateCartItem = async (req: Request, res: Response): Promise<void>
       return;
     }
 
+    const itemSize = size || "";
+    const itemColor = color || "";
+
     const item: any = cart.items.find((item: any) => {
       const itemProdId = item.product?._id ? item.product._id.toString() : item.product?.toString();
-      return itemProdId === String(productId);
+      const sameProduct = itemProdId === String(productId);
+      const sameSize = (item.size || "") === itemSize;
+      const sameColor = (item.color || "") === itemColor;
+      return sameProduct && sameSize && sameColor;
     });
 
     if (!item) {
@@ -192,16 +211,19 @@ export const updateCartItem = async (req: Request, res: Response): Promise<void>
     item.quantity = Number(quantity);
 
     if (item.quantity <= 0) {
-      cart.items = cart.items.filter((item: any) => {
-        const itemProdId = item.product?._id ? item.product._id.toString() : item.product?.toString();
-        return itemProdId !== String(productId);
+      cart.items = cart.items.filter((i: any) => {
+        const itemProdId = i.product?._id ? i.product._id.toString() : i.product?.toString();
+        const sameProduct = itemProdId === String(productId);
+        const sameSize = (i.size || "") === itemSize;
+        const sameColor = (i.color || "") === itemColor;
+        return !(sameProduct && sameSize && sameColor);
       });
     }
 
     cart.items = normalizeCartItems(cart.items) as any;
 
     cart.total = cart.items.reduce(
-      (sum: number, item: any) => sum + item.price * item.quantity,
+      (sum: number, i: any) => sum + i.price * i.quantity,
       0
     );
 
@@ -227,7 +249,7 @@ export const updateCartItem = async (req: Request, res: Response): Promise<void>
 export const removeCartItem = async (req: Request, res: Response): Promise<void> => {
   try {
     const userId = (req as any).user.id;
-    const { productId } = req.body;
+    const { productId, size, color } = req.body;
 
     const cart = await Cart.findOne({ user: userId });
 
@@ -239,15 +261,21 @@ export const removeCartItem = async (req: Request, res: Response): Promise<void>
       return;
     }
 
-    cart.items = cart.items.filter((item: any) => {
-      const itemProdId = item.product?._id ? item.product._id.toString() : item.product?.toString();
-      return itemProdId !== String(productId);
+    const itemSize = size || "";
+    const itemColor = color || "";
+
+    cart.items = cart.items.filter((i: any) => {
+      const itemProdId = i.product?._id ? i.product._id.toString() : i.product?.toString();
+      const sameProduct = itemProdId === String(productId);
+      const sameSize = (i.size || "") === itemSize;
+      const sameColor = (i.color || "") === itemColor;
+      return !(sameProduct && sameSize && sameColor);
     });
 
     cart.items = normalizeCartItems(cart.items) as any;
 
     cart.total = cart.items.reduce(
-      (sum: number, item: any) => sum + item.price * item.quantity,
+      (sum: number, i: any) => sum + i.price * i.quantity,
       0
     );
 
@@ -336,9 +364,15 @@ export const mergeCart = async (
           ? product.discountPrice
           : product.price;
 
+      const itemSize = guestItem.size || "";
+      const itemColor = guestItem.color || "";
+
       const existingItem: any = cart.items.find((item: any) => {
         const itemProdId = item.product?._id ? item.product._id.toString() : item.product?.toString();
-        return itemProdId === String(guestItem.product);
+        const sameProduct = itemProdId === String(guestItem.product);
+        const sameSize = (item.size || "") === itemSize;
+        const sameColor = (item.color || "") === itemColor;
+        return sameProduct && sameSize && sameColor;
       });
 
       if (existingItem) {
@@ -349,9 +383,13 @@ export const mergeCart = async (
           product: product._id,
           quantity: Number(guestItem.quantity || 1),
           price,
+          size: itemSize,
+          color: itemColor,
         } as any);
       }
     }
+
+    cart.items = normalizeCartItems(cart.items) as any;
 
     cart.total = cart.items.reduce(
       (sum: number, item: any) => sum + item.price * item.quantity,

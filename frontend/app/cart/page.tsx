@@ -302,7 +302,13 @@ export default function CartPage() {
               <div className="space-y-4">
                 {cart.items.map((item: any, index: number) => {
                   const itemId = item.product?._id?.toString() || item.product?.toString() || index;
-                  return <CartItem key={itemId} item={item} />;
+                  return (
+                    <CartItem 
+                      key={itemId} 
+                      item={item} 
+                      maxStock={item.stock || item.product?.stock || 10} 
+                    />
+                  );
                 })}
               </div>
             </div>

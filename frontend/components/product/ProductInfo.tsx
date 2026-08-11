@@ -17,7 +17,6 @@ import {
   ShieldAlert,
   FileText,
   Layers,
-  MessageSquare,
 } from "lucide-react";
 import { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
@@ -156,8 +155,6 @@ export default function ProductInfo({
       : product.pricing?.price || 0
   );
 
-  const currentPrice = basePrice;
-
   const discountPrice = Number(
     selectedVariant?.discountPrice && Number(selectedVariant.discountPrice) > 0
       ? selectedVariant.discountPrice
@@ -173,14 +170,14 @@ export default function ProductInfo({
   const lowStockThreshold = product.inventory?.lowStockThreshold || 5;
 
   const discountPercentage =
-    discountPrice && discountPrice < currentPrice
-      ? Math.round(((currentPrice - discountPrice) / currentPrice) * 100)
+    discountPrice && discountPrice < basePrice
+      ? Math.round(((basePrice - discountPrice) / basePrice) * 100)
       : 0;
 
   const salePrice =
     discountPrice && discountPrice > 0
       ? discountPrice
-      : currentPrice;
+      : basePrice;
 
   const displaySku = (() => {
     const baseSku = 
@@ -219,6 +216,7 @@ export default function ProductInfo({
         ...productWithSelections,
         selectedSize,
         selectedColor,
+        stock: currentStock, // ভ্যারিয়েন্টের সঠিক স্টকটি এখানে পাস করা হলো
       }, quantity);
       router.push("/cart");
     } catch (error) {
@@ -241,6 +239,7 @@ export default function ProductInfo({
         ...productWithSelections,
         selectedSize,
         selectedColor,
+        stock: currentStock, // ভ্যারিয়েন্টের সঠিক স্টকটি এখানে পাস করা হলো
       }, quantity);
       router.push("/checkout");
     } catch (error) {
@@ -280,7 +279,6 @@ export default function ProductInfo({
 
   const productDescription = product.description || (product as any).details || "";
 
-  // Real ratings & reviews data fallback extraction from product object
   const ratingsAvg = Number(product.ratingsAverage || (product as any).averageRating || 0);
   const ratingsQty = Number(product.ratingsQuantity || (product as any).totalReviews || (product as any).numReviews || 0);
 
@@ -352,7 +350,7 @@ export default function ProductInfo({
             {discountPrice && discountPrice > 0 && (
               <div className="flex items-center gap-2.5">
                 <span className="line-through text-zinc-400 text-base font-semibold">
-                  {formatPrice(currentPrice)}
+                  {formatPrice(basePrice)}
                 </span>
                 <span className="bg-rose-600 text-white font-black text-[10px] px-2 py-0.5 rounded-md uppercase tracking-wider">
                   Save {discountPercentage}%
