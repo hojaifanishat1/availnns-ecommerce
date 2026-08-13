@@ -1,24 +1,17 @@
 "use client";
 
-import {
-  useState
-} from "react";
-
-import {
-  Plus
-} from "lucide-react";
+import { useEffect, useMemo, useState } from "react";
+import { Plus } from "lucide-react";
 import { DefaultVariant } from "@/constants/variants";
 
 interface Props {
-  attributeLabel?: string; // ১. প্রপসটি এখানে রিসিভ করার জন্য ডিফাইন করা হলো
-  onGenerate: (
-    variants: DefaultVariant[]
-  ) => void;
+  attributeLabel?: string;
+  onGenerate: (variants: DefaultVariant[]) => void;
 }
 
-// সাধারণ কালারগুলোর জন্য নিখুঁত হেক্স ম্যাপিং
 const getColorHex = (colorName: string): string => {
   const name = colorName.trim().toLowerCase();
+
   const hexMap: Record<string, string> = {
     red: "#EF4444",
     blue: "#3B82F6",
@@ -34,101 +27,221 @@ const getColorHex = (colorName: string): string => {
     navy: "#1E3A8A",
     brown: "#92400E",
   };
+
   return hexMap[name] || "#000000";
+};
+
+type VariantConfig = {
+  attributeLabel: string;
+  attributePlaceholder: string;
+  colorLabel: string;
+  colorPlaceholder: string;
+};
+
+const getVariantConfig = (
+  attributeLabel: string
+): VariantConfig => {
+  const label = attributeLabel.toLowerCase();
+
+  // Mobile / Laptop / Electronics
+  if (
+    label.includes("ram") ||
+    label.includes("storage")
+  ) {
+    return {
+      attributeLabel: "RAM & Storage (comma-separated)",
+      attributePlaceholder: "8GB/128GB, 12GB/256GB, 16GB/512GB",
+      colorLabel: "Colors (comma-separated)",
+      colorPlaceholder: "Black, Blue, Silver",
+    };
+  }
+
+  // Watch
+  if (
+    label.includes("dial") ||
+    label.includes("strap")
+  ) {
+    return {
+      attributeLabel: "Dial / Strap Size (comma-separated)",
+      attributePlaceholder: "40mm, 44mm, 46mm",
+      colorLabel: "Strap Colors (comma-separated)",
+      colorPlaceholder: "Black, Brown, Blue",
+    };
+  }
+
+  // Accessories
+  if (
+    label.includes("specification") ||
+    label.includes("accessory")
+  ) {
+    return {
+      attributeLabel: "Specification / Type (comma-separated)",
+      attributePlaceholder: "Standard, Pro, Premium",
+      colorLabel: "Colors (comma-separated)",
+      colorPlaceholder: "Black, White, Blue",
+    };
+  }
+
+  // Shoes
+  if (
+    label.includes("shoe") ||
+    label.includes("footwear")
+  ) {
+    return {
+      attributeLabel: "Sizes (comma-separated)",
+      attributePlaceholder: "39, 40, 41, 42, 43",
+      colorLabel: "Colors (comma-separated)",
+      colorPlaceholder: "Black, White, Red",
+    };
+  }
+
+  // Clothing
+  if (
+    label.includes("cloth") ||
+    label.includes("fashion") ||
+    label.includes("apparel") ||
+    label.includes("shirt") ||
+    label.includes("pant") ||
+    label.includes("dress")
+  ) {
+    return {
+      attributeLabel: "Sizes (comma-separated)",
+      attributePlaceholder: "S, M, L, XL, XXL",
+      colorLabel: "Colors (comma-separated)",
+      colorPlaceholder: "Black, White, Blue",
+    };
+  }
+
+  // Default
+  return {
+    attributeLabel: "Sizes (comma-separated)",
+    attributePlaceholder: "S, M, L, XL",
+    colorLabel: "Colors (comma-separated)",
+    colorPlaceholder: "Red, Blue, Black",
+  };
 };
 
 export default function VariantGenerator({
   attributeLabel = "Size",
-  onGenerate
+  onGenerate,
 }: Props) {
-  const [
-    sizes,
-    setSizes
-  ] = useState("");
+  const [sizes, setSizes] = useState("");
+  const [colors, setColors] = useState("");
 
-  const [
-    colors,
-    setColors
-  ] = useState("");
+  const config = useMemo(
+    () => getVariantConfig(attributeLabel),
+    [attributeLabel]
+  );
 
-  // ২. ক্যাটেগরি অনুযায়ী জেনারেটরের লেবেল ডায়নামিক করার লজিক
-  const getAttributeTitle = () => {
-    if (attributeLabel.includes("RAM")) return "RAM & Storage (comma-separated)";
-    if (attributeLabel.includes("Dial")) return "Dial / Strap Size (comma-separated)";
-    if (attributeLabel.includes("Specification")) return "Specification / Type (comma-separated)";
-    return "Sizes (comma-separated)";
-  };
-
-  const getPlaceholder = () => {
-    if (attributeLabel.includes("RAM")) return "8GB/128GB, 12GB/256GB";
-    if (attributeLabel.includes("Dial")) return "40mm, 44mm";
-    if (attributeLabel.includes("Specification")) return "Standard, Pro";
-    return "S, M, L, XL";
-  };
+  /*
+   * IMPORTANT:
+   *
+   * Category change হলে আগের category-r input
+   * যেন নতুন category-te থেকে না যায়।
+   */
+  useEffect(() => {
+    setSizes("");
+    setColors("");
+  }, [attributeLabel]);
 
   const generate = () => {
-    const sizeList =
-      sizes
-        .split(",")
-        .map(
-          x => x.trim()
-        )
-        .filter(Boolean);
+    const sizeList = sizes
+      .split(",")
+      .map((x) => x.trim())
+      .filter(Boolean);
 
-    const colorList =
-      colors
-        .split(",")
-        .map(
-          x => x.trim()
-        )
-        .filter(Boolean);
+    const colorList = colors
+      .split(",")
+      .map((x) => x.trim())
+      .filter(Boolean);
 
     const result: DefaultVariant[] = [];
 
-    if (
-      sizeList.length && colorList.length
-    ) {
-      sizeList.forEach(size => {
-        colorList.forEach(color => {
+    /*
+     * Primary attribute + Color
+     */
+    if (sizeList.length && colorList.length) {
+      sizeList.forEach((size) => {
+        colorList.forEach((color) => {
           result.push({
-            sku: `${size}-${color}`.toUpperCase(),
+            sku: `${size}-${color}`
+              .replace(/\s+/g, "-")
+              .toUpperCase(),
+
             size,
+
             color,
+
             colorHex: getColorHex(color),
+
             stock: 0,
+
             price: 0,
+
             discountPrice: 0,
+
             image: "",
-            active: true
+
+            active: true,
           });
         });
       });
-    } else if (sizeList.length) {
-      sizeList.forEach(size => {
+    }
+
+    /*
+     * Only primary attribute
+     */
+    else if (sizeList.length) {
+      sizeList.forEach((size) => {
         result.push({
-          sku: size.toUpperCase(),
+          sku: size
+            .replace(/\s+/g, "-")
+            .toUpperCase(),
+
           size,
+
           color: "",
+
           colorHex: "",
+
           stock: 0,
+
           price: 0,
+
           discountPrice: 0,
+
           image: "",
-          active: true
+
+          active: true,
         });
       });
-    } else if (colorList.length) {
-      colorList.forEach(color => {
+    }
+
+    /*
+     * Only color
+     */
+    else if (colorList.length) {
+      colorList.forEach((color) => {
         result.push({
-          sku: color.toUpperCase(),
+          sku: color
+            .replace(/\s+/g, "-")
+            .toUpperCase(),
+
           size: "",
+
           color,
+
           colorHex: getColorHex(color),
+
           stock: 0,
+
           price: 0,
+
           discountPrice: 0,
+
           image: "",
-          active: true
+
+          active: true,
         });
       });
     }
@@ -152,10 +265,13 @@ export default function VariantGenerator({
       </h3>
 
       <div className="space-y-3">
+
+        {/* Primary Attribute */}
         <div>
           <label className="block text-xs font-medium text-gray-700 mb-1">
-            {getAttributeTitle()}
+            {config.attributeLabel}
           </label>
+
           <input
             type="text"
             className="
@@ -169,18 +285,20 @@ export default function VariantGenerator({
               focus:ring-2
               focus:ring-black
             "
-            placeholder={getPlaceholder()}
+            placeholder={config.attributePlaceholder}
             value={sizes}
-            onChange={(e) =>
-              setSizes(e.target.value)
-            }
+            onChange={(e) => {
+              setSizes(e.target.value);
+            }}
           />
         </div>
 
+        {/* Color */}
         <div>
           <label className="block text-xs font-medium text-gray-700 mb-1">
-            Colors (comma-separated)
+            {config.colorLabel}
           </label>
+
           <input
             type="text"
             className="
@@ -194,11 +312,11 @@ export default function VariantGenerator({
               focus:ring-2
               focus:ring-black
             "
-            placeholder="Red, Blue, Black"
+            placeholder={config.colorPlaceholder}
             value={colors}
-            onChange={(e) =>
-              setColors(e.target.value)
-            }
+            onChange={(e) => {
+              setColors(e.target.value);
+            }}
           />
         </div>
       </div>
