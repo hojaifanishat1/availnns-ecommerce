@@ -4,7 +4,6 @@ import {
   useEffect,
   useMemo,
   useState,
-  useTransition,
 } from "react";
 import {
   useRouter,
@@ -78,12 +77,11 @@ export default function ReviewPage() {
   }, [items]);
 
   const shipping = checkout?.deliveryFee || 0;
-  const tax = subtotal * 0.05;
   const discount = checkout?.discount || 0;
 
   const total = Math.max(
     0,
-    subtotal + shipping + tax - discount
+    subtotal + shipping - discount
   );
 
   // =======================
@@ -111,7 +109,7 @@ export default function ReviewPage() {
         ...oldData,
         subtotal,
         shipping,
-        tax,
+        tax: 0,
         discount,
         total,
       })
@@ -228,11 +226,6 @@ export default function ReviewPage() {
                 <div className="flex justify-between text-zinc-600">
                   <span>Delivery Fee</span>
                   <span className="font-semibold text-zinc-900">{formatPrice(shipping)}</span>
-                </div>
-
-                <div className="flex justify-between text-zinc-600">
-                  <span>Estimated Tax (5%)</span>
-                  <span className="font-semibold text-zinc-900">{formatPrice(tax)}</span>
                 </div>
 
                 {discount > 0 && (

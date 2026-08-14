@@ -9,6 +9,7 @@ import {
   Truck,
   CheckCircle2,
   Package,
+  Tag,
 } from "lucide-react";
 
 import useCart from "@/hooks/useCart";
@@ -62,15 +63,26 @@ export default function CartItem({
     "Product";
 
   // =========================================================
-  // VARIANT OBJECT
+  // DIRECT VARIANT
   // =========================================================
 
-  const variant =
+  const directVariant =
     item?.variant ||
     item?.selectedVariant ||
     item?.productVariant ||
     product?.selectedVariant ||
     null;
+
+  // =========================================================
+  // SELECTED VARIANT ID
+  // =========================================================
+
+  const selectedVariantId =
+    item?.variantId?.toString() ||
+    item?.selectedVariantId?.toString() ||
+    item?.variant?._id?.toString() ||
+    item?.selectedVariant?._id?.toString() ||
+    "";
 
   // =========================================================
   // SELECTED VARIANT SKU
@@ -81,11 +93,48 @@ export default function CartItem({
     item?.variantSKU ||
     item?.variantSku ||
     item?.sku ||
-    variant?.sku ||
+    directVariant?.sku ||
     "";
 
   // =========================================================
-  // SELECTED SIZE / RAM / STORAGE
+  // FIND VARIANT FROM PRODUCT.VARIANTS
+  // =========================================================
+
+  const variantFromProduct =
+    Array.isArray(product?.variants)
+      ? product.variants.find(
+          (v: any) => {
+            const variantSku =
+              v?.sku ||
+              v?.SKU ||
+              v?.variantSKU ||
+              v?.variantSku ||
+              "";
+
+            const variantId =
+              v?._id?.toString() || "";
+
+            const skuMatch =
+              selectedVariantSKU &&
+              String(variantSku).toLowerCase() ===
+                String(selectedVariantSKU).toLowerCase();
+
+            const idMatch =
+              selectedVariantId &&
+              variantId === selectedVariantId;
+
+            return skuMatch || idMatch;
+          }
+        )
+      : null;
+
+  const variant =
+    directVariant ||
+    variantFromProduct ||
+    null;
+
+  // =========================================================
+  // SELECTED SIZE / RAM / STORAGE / CAPACITY
   // =========================================================
 
   const selectedSize =
@@ -95,20 +144,31 @@ export default function CartItem({
     item?.capacity ||
     item?.storage ||
     item?.ram ||
+
     variant?.size ||
     variant?.capacity ||
     variant?.storage ||
     variant?.ram ||
+
     variant?.attributes?.size ||
     variant?.attributes?.capacity ||
     variant?.attributes?.storage ||
     variant?.attributes?.ram ||
+
     variant?.options?.find(
       (option: any) =>
-        ["size", "storage", "capacity", "ram"].includes(
-          String(option?.name || "").toLowerCase()
+        [
+          "size",
+          "storage",
+          "capacity",
+          "ram",
+        ].includes(
+          String(
+            option?.name || ""
+          ).toLowerCase()
         )
     )?.value ||
+
     product?.selectedSize ||
     product?.size ||
     product?.capacity ||
@@ -123,16 +183,25 @@ export default function CartItem({
     item?.selectedColor ||
     item?.color ||
     item?.variantColor ||
+
     variant?.color ||
     variant?.colour ||
+
     variant?.attributes?.color ||
     variant?.attributes?.colour ||
+
     variant?.options?.find(
       (option: any) =>
-        ["color", "colour"].includes(
-          String(option?.name || "").toLowerCase()
+        [
+          "color",
+          "colour",
+        ].includes(
+          String(
+            option?.name || ""
+          ).toLowerCase()
         )
     )?.value ||
+
     product?.selectedColor ||
     product?.color ||
     "";
@@ -149,18 +218,6 @@ export default function CartItem({
     "";
 
   // =========================================================
-  // VARIANT DISPLAY NAME
-  // =========================================================
-
-  const variantParts = [
-    selectedSize,
-    selectedColor,
-  ].filter(Boolean);
-
-  const variantLabel =
-    variantParts.join(" • ");
-
-  // =========================================================
   // STOCK
   // =========================================================
 
@@ -174,26 +231,145 @@ export default function CartItem({
     999;
 
   // =========================================================
-  // PRICE
+  // PRICE SOURCES
   // =========================================================
 
-  const price = Number(
-    item?.price ??
+  /*
+   * IMPORTANT:
+   *
+   * item.price অনেক সময় backend/cart থেকে
+   * original price হিসেবে আসে।
+   *
+   * তাই item.price প্রথমে নেওয়া হচ্ছে না।
+   *
+   * Priority:
+   *
+   * 1. Variant discountPrice
+   * 2. Item discountPrice
+   * 3. Product discountPrice
+   * 4. Variant price
+   * 5. Product price
+   * 6. Item price
+   */
+
+  const variantDiscountPrice = Number(
     variant?.discountPrice ??
-    variant?.price ??
+    variant?.salePrice ??
+    variant?.offerPrice ??
+    0
+  );
+
+  const itemDiscountPrice = Number(
+    item?.discountPrice ??
+    item?.salePrice ??
+    item?.offerPrice ??
+    0
+  );
+
+  const productDiscountPrice = Number(
     product?.discountPrice ??
-    product?.price ??
     product?.pricing?.discountPrice ??
-    product?.pricing?.price ??
+    product?.salePrice ??
+    product?.offerPrice ??
     0
   );
 
   // =========================================================
-  // TOTAL
+  // REGULAR / ORIGINAL PRICE
+  // =========================================================
+
+  const variantRegularPrice = Number(
+    variant?.price ??
+    variant?.regularPrice ??
+    variant?.basePrice ??
+    0
+  );
+
+  const productRegularPrice = Number(
+    product?.price ??
+    product?.pricing?.price ??
+    product?.regularPrice ??
+    0
+  );
+
+  const itemRegularPrice = Number(
+    item?.originalPrice ??
+    item?.regularPrice ??
+    item?.basePrice ??
+    item?.price ??
+    0
+  );
+
+  // =========================================================
+  // FINAL SELLING PRICE
+  // =========================================================
+
+  let price = 0;
+
+  if (variantDiscountPrice > 0) {
+    price = variantDiscountPrice;
+  } else if (itemDiscountPrice > 0) {
+    price = itemDiscountPrice;
+  } else if (productDiscountPrice > 0) {
+    price = productDiscountPrice;
+  } else if (variantRegularPrice > 0) {
+    price = variantRegularPrice;
+  } else if (productRegularPrice > 0) {
+    price = productRegularPrice;
+  } else {
+    price = itemRegularPrice;
+  }
+
+  // =========================================================
+  // ORIGINAL PRICE
+  // =========================================================
+
+  let originalPrice = 0;
+
+  if (
+    variantRegularPrice > 0 &&
+    variantRegularPrice > price
+  ) {
+    originalPrice = variantRegularPrice;
+  } else if (
+    productRegularPrice > 0 &&
+    productRegularPrice > price
+  ) {
+    originalPrice = productRegularPrice;
+  } else if (
+    itemRegularPrice > 0 &&
+    itemRegularPrice > price
+  ) {
+    originalPrice = itemRegularPrice;
+  }
+
+  // =========================================================
+  // DISCOUNT
+  // =========================================================
+
+  const hasDiscount =
+    originalPrice > price &&
+    price > 0;
+
+  const discountPercentage =
+    hasDiscount
+      ? Math.round(
+          ((originalPrice - price) /
+            originalPrice) *
+            100
+        )
+      : 0;
+
+  // =========================================================
+  // QUANTITY
   // =========================================================
 
   const quantity =
     Number(item?.quantity) || 1;
+
+  // =========================================================
+  // TOTAL
+  // =========================================================
 
   const total =
     price * quantity;
@@ -203,14 +379,16 @@ export default function CartItem({
   // =========================================================
 
   const image =
+    variant?.image?.url ||
     variant?.image ||
+    item?.image?.url ||
     item?.image ||
     product?.images?.[0]?.url ||
     product?.images?.[0] ||
     "/placeholder.png";
 
   // =========================================================
-  // REMOVE
+  // REMOVE ITEM
   // =========================================================
 
   const handleRemoveItem = async () => {
@@ -224,7 +402,8 @@ export default function CartItem({
           selectedSize,
           selectedColor,
           selectedVariantSKU,
-          status: "Item removed from cart",
+          status:
+            "Item removed from cart",
         })
       );
 
@@ -301,11 +480,12 @@ export default function CartItem({
       className="
         rounded-2xl
         border
+        border-zinc-200
         bg-white
         p-4
         shadow-sm
-        hover:shadow-md
         transition
+        hover:shadow-md
       "
     >
       <div
@@ -338,8 +518,7 @@ export default function CartItem({
             className="object-cover"
           />
 
-          {(product?.discountPrice ||
-            variant?.discountPrice) && (
+          {hasDiscount && (
             <span
               className="
                 absolute
@@ -354,7 +533,7 @@ export default function CartItem({
                 text-white
               "
             >
-              Sale
+              -{discountPercentage}%
             </span>
           )}
         </div>
@@ -384,6 +563,8 @@ export default function CartItem({
 
             <div className="min-w-0">
 
+              {/* PRODUCT NAME */}
+
               <h3
                 className="
                   font-bold
@@ -410,7 +591,7 @@ export default function CartItem({
                   "
                 >
 
-                  {/* SIZE / RAM / STORAGE */}
+                  {/* SIZE */}
 
                   {selectedSize && (
                     <span
@@ -440,8 +621,8 @@ export default function CartItem({
 
                       <strong
                         className="
-                          text-zinc-900
                           font-bold
+                          text-zinc-900
                         "
                       >
                         {selectedSize}
@@ -507,9 +688,9 @@ export default function CartItem({
 
                       <strong
                         className="
-                          text-zinc-900
                           font-bold
                           capitalize
+                          text-zinc-900
                         "
                       >
                         {selectedColor}
@@ -529,11 +710,11 @@ export default function CartItem({
                 <div
                   className="
                     mt-2
+                    break-all
                     text-[10px]
                     font-mono
                     font-semibold
                     text-zinc-400
-                    break-all
                   "
                 >
                   SKU:{" "}
@@ -549,20 +730,75 @@ export default function CartItem({
               {/* PRICE */}
               {/* ================================================= */}
 
-              <p
+              <div
                 className="
                   mt-2
-                  text-xl
-                  font-black
-                  text-zinc-950
+                  flex
+                  flex-wrap
+                  items-center
+                  gap-2
                 "
               >
-                {formatPrice(price)}
-              </p>
+
+                {/* CURRENT PRICE */}
+
+                <p
+                  className="
+                    text-xl
+                    font-black
+                    text-zinc-950
+                  "
+                >
+                  {formatPrice(price)}
+                </p>
+
+                {/* ORIGINAL PRICE */}
+
+                {hasDiscount && (
+                  <p
+                    className="
+                      text-sm
+                      font-medium
+                      text-zinc-400
+                      line-through
+                    "
+                  >
+                    {formatPrice(
+                      originalPrice
+                    )}
+                  </p>
+                )}
+
+                {/* SAVING */}
+
+                {hasDiscount && (
+                  <span
+                    className="
+                      inline-flex
+                      items-center
+                      gap-1
+                      rounded-md
+                      bg-emerald-50
+                      px-2
+                      py-1
+                      text-[10px]
+                      font-bold
+                      text-emerald-600
+                    "
+                  >
+                    <Tag size={11} />
+
+                    SAVE {discountPercentage}%
+                  </span>
+                )}
+
+              </div>
 
             </div>
 
-            {/* REMOVE */}
+            {/* ================================================= */}
+            {/* REMOVE BUTTON */}
+            {/* ================================================= */}
 
             <button
               type="button"
@@ -572,8 +808,8 @@ export default function CartItem({
               className="
                 shrink-0
                 text-gray-400
-                hover:text-red-500
                 transition
+                hover:text-red-500
               "
               aria-label="Remove item"
             >
@@ -651,15 +887,17 @@ export default function CartItem({
             "
           >
 
+            {/* ================================================= */}
             {/* QUANTITY */}
+            {/* ================================================= */}
 
             <div
               className="
                 flex
                 items-center
+                overflow-hidden
                 rounded-full
                 border
-                overflow-hidden
               "
             >
 
@@ -671,14 +909,14 @@ export default function CartItem({
                   Number(stock) <= 0
                 }
                 className="
+                  flex
                   h-9
                   w-9
-                  flex
                   items-center
                   justify-center
+                  transition
                   hover:bg-gray-100
                   disabled:opacity-30
-                  transition
                 "
                 aria-label="Decrease quantity"
               >
@@ -703,14 +941,14 @@ export default function CartItem({
                   quantity >= Number(stock)
                 }
                 className="
+                  flex
                   h-9
                   w-9
-                  flex
                   items-center
                   justify-center
+                  transition
                   hover:bg-gray-100
                   disabled:opacity-30
-                  transition
                 "
                 aria-label="Increase quantity"
               >
@@ -719,7 +957,9 @@ export default function CartItem({
 
             </div>
 
+            {/* ================================================= */}
             {/* TOTAL */}
+            {/* ================================================= */}
 
             <div className="text-right">
 
@@ -734,20 +974,35 @@ export default function CartItem({
 
               <p
                 className="
-                  font-black
                   text-lg
+                  font-black
                   text-zinc-950
                 "
               >
                 {formatPrice(total)}
               </p>
 
+              {hasDiscount && (
+                <p
+                  className="
+                    text-[11px]
+                    text-zinc-400
+                    line-through
+                  "
+                >
+                  {formatPrice(
+                    originalPrice *
+                      quantity
+                  )}
+                </p>
+              )}
+
             </div>
 
           </div>
 
           {/* ================================================= */}
-          {/* BOTTOM ACTIONS */}
+          {/* ACTIONS */}
           {/* ================================================= */}
 
           <div
@@ -776,8 +1031,8 @@ export default function CartItem({
                 py-2
                 text-sm
                 font-medium
-                hover:bg-gray-50
                 transition
+                hover:bg-gray-50
               "
             >
               <Heart size={16} />
@@ -797,8 +1052,8 @@ export default function CartItem({
                 text-sm
                 font-medium
                 text-red-500
-                hover:bg-red-50
                 transition
+                hover:bg-red-50
               "
             >
               Remove

@@ -19,9 +19,8 @@ import {
   User,
   Phone,
   Plus,
-  ArrowRight,
-  Lock,
 } from "lucide-react";
+
 import api from "@/services/api";
 import useCart from "@/hooks/useCart";
 import {
@@ -30,62 +29,162 @@ import {
 import CheckoutHeader from "@/components/checkout/CheckoutHeader";
 import CheckoutStepper from "@/components/checkout/CheckoutStepper";
 import LocationPicker from "@/components/checkout/LocationPicker";
+import OrderSummary from "@/components/checkout/OrderSummary";
 import {
   getDeliveryZones,
 } from "@/services/deliveryZone.service";
 
+// ======================================================
+// TYPES
+// ======================================================
+
+type LocationData = {
+  formattedAddress: string;
+  division: string;
+  district: string;
+  area: string;
+  road: string;
+  latitude: string;
+  longitude: string;
+  googleMapLink: string;
+};
+
+type CheckoutForm = {
+  name: string;
+  phone: string;
+  country: string;
+  location: LocationData;
+};
+
+type DeliveryType = "regular" | "express";
+
+// ======================================================
+// HELPERS
+// ======================================================
+
+const cleanString = (value: any): string => {
+  if (value === undefined || value === null) {
+    return "";
+  }
+  return String(value).trim();
+};
+
+// ======================================================
+// PAGE
+// ======================================================
+
 export default function CheckoutPage() {
   const router = useRouter();
 
+  // ====================================================
+  // CART
+  // ====================================================
+
   const {
     cart,
-    loading: cartLoading
+    loading: cartLoading,
   } = useCart();
 
+  // ====================================================
+  // CURRENCY
+  // ====================================================
+
   const {
-    formatPrice
+    formatPrice,
   } = useCurrency();
 
+  // ====================================================
+  // CART ITEMS
+  // ====================================================
+
   const items = useMemo(
-    () => cart?.items || [],
+    () =>
+      Array.isArray(cart?.items)
+        ? cart.items
+        : [],
     [cart]
   );
 
+  // ====================================================
+  // USER
+  // ====================================================
+
   const [
     user,
-    setUser
+    setUser,
   ] = useState<any>(null);
 
   const [
     userLoading,
-    setUserLoading
+    setUserLoading,
   ] = useState(true);
+
+  // ====================================================
+  // DELIVERY ZONES
+  // ====================================================
 
   const [
     zones,
-    setZones
+    setZones,
   ] = useState<any[]>([]);
-  
-  const [showLocationModal, setShowLocationModal] = useState<boolean>(false);
 
-  const [matchedRegularZone, setMatchedRegularZone] = useState<any>(null);
-  const [matchedExpressZone, setMatchedExpressZone] = useState<any>(null);
-  const [expressAvailable, setExpressAvailable] = useState<boolean>(false);
-  const [deliveryType, setDeliveryType] = useState<"regular" | "express">("regular");
-  const [selectedZone, setSelectedZone] = useState("");
+  const [
+    matchedRegularZone,
+    setMatchedRegularZone,
+  ] = useState<any>(null);
+
+  const [
+    matchedExpressZone,
+    setMatchedExpressZone,
+  ] = useState<any>(null);
+
+  const [
+    expressAvailable,
+    setExpressAvailable,
+  ] = useState(false);
+
+  const [
+    deliveryType,
+    setDeliveryType,
+  ] = useState<DeliveryType>(
+    "regular"
+  );
+
+  const [
+    selectedZone,
+    setSelectedZone,
+  ] = useState("");
+
+  // ====================================================
+  // LOCATION MODAL
+  // ====================================================
+
+  const [
+    showLocationModal,
+    setShowLocationModal,
+  ] = useState(false);
+
+  // ====================================================
+  // ERROR
+  // ====================================================
 
   const [
     error,
-    setError
+    setError,
   ] = useState("");
+
+  // ====================================================
+  // FORM
+  // ====================================================
 
   const [
     form,
-    setForm
-  ] = useState({
+    setForm,
+  ] = useState<CheckoutForm>({
     name: "",
     phone: "",
     country: "Bangladesh",
+
     location: {
       formattedAddress: "",
       division: "",
@@ -95,258 +194,960 @@ export default function CheckoutPage() {
       latitude: "",
       longitude: "",
       googleMapLink: "",
-    }
+    },
   });
 
+  // ====================================================
+  // SUBTOTAL (WITH DISCOUNT & VARIANT SUPPORT)
+  // ====================================================
+
   const subtotal = useMemo(() => {
-    return items.reduce((acc: number, item: any) => {
-      const price = item?.product?.discountPrice || item?.product?.price || item?.price || 0;
-      return acc + price * item.quantity;
-    }, 0);
+    return items.reduce(
+      (
+        total: number,
+        item: any
+      ) => {
+        const product = item?.product || {};
+        const variant = item?.variant || product?.variant || null;
+        
+        const basePrice = Number(
+          variant?.price ??
+            item?.price ??
+            product?.price ??
+            0
+        );
+
+        const discountPrice = Number(
+          variant?.discountPrice ??
+            item?.discountPrice ??
+            product?.discountPrice ??
+            0
+        );
+
+        const hasDiscount = discountPrice > 0 && discountPrice < basePrice;
+        const effectiveUnitPrice = hasDiscount ? discountPrice : basePrice;
+
+        const quantity = Number(
+          item?.quantity || 1
+        );
+
+        return (
+          total +
+          effectiveUnitPrice * quantity
+        );
+      },
+      0
+    );
   }, [items]);
 
-  // =====================
-  // PROCESS ZONES BASED ON LOCATION
-  // =====================
-  const processZonesAndLocation = (loc: any, allZones: any[], currentDeliveryType = deliveryType) => {
-    if (!allZones || allZones.length === 0) return;
+  // ====================================================
+  // PROCESS DELIVERY ZONES
+  // ====================================================
 
-    const district = (loc.district || "").toLowerCase();
-    const area = (loc.area || loc.formattedAddress || "").toLowerCase();
+  const processZonesAndLocation = (
+    location: LocationData,
+    allZones: any[]
+  ) => {
+    if (
+      !Array.isArray(allZones) ||
+      allZones.length === 0
+    ) {
+      setMatchedRegularZone(null);
+      setMatchedExpressZone(null);
+      setExpressAvailable(false);
+      setSelectedZone("");
+      return;
+    }
 
-    const checkIsExpress = (zone: any) => {
-      const zName = (zone.name || "").toLowerCase();
-      const zDays = (zone.estimatedDays || "").toLowerCase();
-      return zName.includes("3 hour") || zName.includes("express") || zDays.includes("3 hour");
+    const district =
+      cleanString(
+        location?.district
+      ).toLowerCase();
+
+    const area =
+      cleanString(
+        location?.area
+      ).toLowerCase();
+
+    const formattedAddress =
+      cleanString(
+        location?.formattedAddress
+      ).toLowerCase();
+
+    const checkIsExpress = (
+      zone: any
+    ) => {
+      const name =
+        cleanString(
+          zone?.name
+        ).toLowerCase();
+
+      const estimatedDays =
+        cleanString(
+          zone?.estimatedDays
+        ).toLowerCase();
+
+      const deliveryType =
+        cleanString(
+          zone?.deliveryType
+        ).toLowerCase();
+
+      return (
+        name.includes("3 hour") ||
+        name.includes("3-hour") ||
+        name.includes("express") ||
+        estimatedDays.includes(
+          "3 hour"
+        ) ||
+        estimatedDays.includes(
+          "3-hour"
+        ) ||
+        deliveryType === "express"
+      );
     };
 
-    const matchesLocation = (zone: any) => {
-      const zName = (zone.name || "").toLowerCase();
-      if (!district && !area) return true;
-      return (district && zName.includes(district)) || (area && zName.includes(area)) || zName.includes("kishoreganj");
+    const matchesLocation = (
+      zone: any
+    ) => {
+      const zoneName =
+        cleanString(
+          zone?.name
+        ).toLowerCase();
+
+      const zoneDistrict =
+        cleanString(
+          zone?.district
+        ).toLowerCase();
+
+      const zoneArea =
+        cleanString(
+          zone?.area
+        ).toLowerCase();
+
+      if (
+        !district &&
+        !area &&
+        !formattedAddress
+      ) {
+        return true;
+      }
+
+      if (
+        district &&
+        (
+          zoneName.includes(
+            district
+          ) ||
+          zoneDistrict.includes(
+            district
+          )
+        )
+      ) {
+        return true;
+      }
+
+      if (
+        area &&
+        (
+          zoneName.includes(
+            area
+          ) ||
+          zoneArea.includes(
+            area
+          )
+        )
+      ) {
+        return true;
+      }
+
+      if (
+        formattedAddress &&
+        zoneName.includes(
+          formattedAddress
+        )
+      ) {
+        return true;
+      }
+
+      if (
+        zoneName.includes(
+          "kishoreganj"
+        )
+      ) {
+        return true;
+      }
+
+      return false;
     };
 
-    const foundExpress = allZones.find((zone) => {
-      return checkIsExpress(zone) && matchesLocation(zone);
-    });
+    const expressZones =
+      allZones.filter(
+        checkIsExpress
+      );
 
-    const finalExpress = foundExpress || allZones.find(z => checkIsExpress(z));
+    const matchingExpress =
+      expressZones.find(
+        matchesLocation
+      );
+
+    const finalExpress =
+      matchingExpress ||
+      expressZones[0] ||
+      null;
+
+    const regularZones =
+      allZones.filter(
+        (zone) =>
+          !checkIsExpress(zone)
+      );
+
+    const matchingRegular =
+      regularZones.find(
+        matchesLocation
+      );
+
+    const finalRegular =
+      matchingRegular ||
+      regularZones[0] ||
+      allZones[0] ||
+      null;
 
     if (finalExpress) {
       setExpressAvailable(true);
-      setMatchedExpressZone(finalExpress);
+
+      setMatchedExpressZone(
+        finalExpress
+      );
     } else {
       setExpressAvailable(false);
+
       setMatchedExpressZone(null);
-      if (currentDeliveryType === "express") {
-        setDeliveryType("regular");
-      }
+
+      setDeliveryType(
+        "regular"
+      );
     }
 
-    const foundRegular = allZones.find((zone) => {
-      return !checkIsExpress(zone) && matchesLocation(zone);
-    });
+    setMatchedRegularZone(
+      finalRegular
+    );
 
-    const finalRegular = foundRegular || allZones.find(z => !checkIsExpress(z)) || allZones[0];
-    setMatchedRegularZone(finalRegular);
-
-    const activeSelectedZone = (currentDeliveryType === "express" && finalExpress) 
-      ? finalExpress._id 
-      : finalRegular?._id;
-      
-    if (activeSelectedZone) {
-      setSelectedZone(activeSelectedZone);
+    if (
+      deliveryType ===
+        "express" &&
+      finalExpress
+    ) {
+      setSelectedZone(
+        String(
+          finalExpress?._id || ""
+        )
+      );
+    } else if (
+      finalRegular
+    ) {
+      setSelectedZone(
+        String(
+          finalRegular?._id || ""
+        )
+      );
     }
   };
 
-  // =====================
-  // LOAD USER & DEFAULT ADDRESS
-  // =====================
+  // ====================================================
+  // LOAD USER
+  // ====================================================
+
   useEffect(() => {
-    const loadUserAndDefaultAddress = async () => {
+    let mounted = true;
+
+    const loadUser = async () => {
       try {
-        const token = localStorage.getItem("token");
+        setUserLoading(true);
+
+        const token =
+          localStorage.getItem(
+            "token"
+          );
 
         if (!token) {
-          router.replace("/login?redirect=/checkout");
+          router.replace(
+            "/login?redirect=/checkout"
+          );
+
           return;
         }
 
-        const res = await api.get("/users/me");
-        const userData = res.data.user;
-        setUser(userData);
+        const response =
+          await api.get(
+            "/users/me"
+          );
 
-        let defaultLoc = {
-          formattedAddress: userData?.address || userData?.location?.formattedAddress || "",
-          division: userData?.division || "",
-          district: userData?.district || "",
-          area: userData?.area || "",
-          road: userData?.road || "",
-          latitude: userData?.latitude || userData?.location?.latitude || "",
-          longitude: userData?.longitude || userData?.location?.longitude || "",
-          googleMapLink: userData?.googleMapLink || "",
-        };
+        if (!mounted) {
+          return;
+        }
 
-        const localData = localStorage.getItem("user_addresses");
-        if (localData) {
+        const userData =
+          response?.data?.user ||
+          response?.data;
+
+        setUser(
+          userData
+        );
+
+        let defaultLocation: LocationData =
+          {
+            formattedAddress:
+              userData?.address ||
+              userData?.location
+                ?.formattedAddress ||
+              "",
+
+            division:
+              userData?.division ||
+              userData?.location
+                ?.division ||
+              "",
+
+            district:
+              userData?.district ||
+              userData?.location
+                ?.district ||
+              "",
+
+            area:
+              userData?.area ||
+              userData?.location
+                ?.area ||
+              "",
+
+            road:
+              userData?.road ||
+              userData?.location
+                ?.road ||
+              "",
+
+            latitude:
+              userData?.latitude ||
+              userData?.location
+                ?.latitude ||
+              "",
+
+            longitude:
+              userData?.longitude ||
+              userData?.location
+                ?.longitude ||
+              "",
+
+            googleMapLink:
+              userData?.googleMapLink ||
+              userData?.location
+                ?.googleMapLink ||
+              "",
+          };
+
+        const savedAddresses =
+          localStorage.getItem(
+            "user_addresses"
+          );
+
+        if (
+          savedAddresses
+        ) {
           try {
-            const parsed = JSON.parse(localData);
-            if (Array.isArray(parsed) && parsed.length > 0) {
-              const defaultAddr = parsed.find((a) => a.isDefault) || parsed[0];
-              if (defaultAddr) {
-                defaultLoc = {
-                  formattedAddress: defaultAddr.street || defaultAddr.location?.formattedAddress || "",
-                  division: defaultAddr.division || "",
-                  district: defaultAddr.city || defaultAddr.district || "",
-                  area: defaultAddr.area || "",
-                  road: defaultAddr.road || "",
-                  latitude: defaultAddr.latitude || defaultAddr.location?.latitude || "",
-                  longitude: defaultAddr.longitude || defaultAddr.location?.longitude || "",
-                  googleMapLink: defaultAddr.googleMapLink || "",
-                };
+            const parsed =
+              JSON.parse(
+                savedAddresses
+              );
+
+            if (
+              Array.isArray(
+                parsed
+              ) &&
+              parsed.length > 0
+            ) {
+              const defaultAddress =
+                parsed.find(
+                  (
+                    address: any
+                  ) =>
+                    address?.isDefault
+                ) ||
+                parsed[0];
+
+              if (
+                defaultAddress
+              ) {
+                defaultLocation =
+                  {
+                    formattedAddress:
+                      defaultAddress?.street ||
+                      defaultAddress
+                        ?.location
+                        ?.formattedAddress ||
+                      defaultAddress
+                        ?.formattedAddress ||
+                      "",
+
+                    division:
+                      defaultAddress?.division ||
+                      defaultAddress
+                        ?.location
+                        ?.division ||
+                      "",
+
+                    district:
+                      defaultAddress?.city ||
+                      defaultAddress?.district ||
+                      defaultAddress
+                        ?.location
+                        ?.district ||
+                      "",
+
+                    area:
+                      defaultAddress?.area ||
+                      defaultAddress
+                        ?.location
+                        ?.area ||
+                      "",
+
+                    road:
+                      defaultAddress?.road ||
+                      defaultAddress
+                        ?.location
+                        ?.road ||
+                      "",
+
+                    latitude:
+                      defaultAddress?.latitude ||
+                      defaultAddress
+                        ?.location
+                        ?.latitude ||
+                      "",
+
+                    longitude:
+                      defaultAddress?.longitude ||
+                      defaultAddress
+                        ?.location
+                        ?.longitude ||
+                      "",
+
+                    googleMapLink:
+                      defaultAddress?.googleMapLink ||
+                      defaultAddress
+                        ?.location
+                        ?.googleMapLink ||
+                      "",
+                  };
               }
             }
-          } catch (e) {
-            console.error("Error parsing saved addresses", e);
+          } catch (
+            addressError
+          ) {
+            console.error(
+              "ADDRESS PARSE ERROR:",
+              addressError
+            );
           }
         }
 
-        setForm(prev => ({
-          ...prev,
-          name: userData?.name || prev.name,
-          phone: userData?.phone || prev.phone,
-          location: defaultLoc,
-        }));
-      } catch (error) {
-        console.log("USER ERROR", error);
-        router.replace("/login?redirect=/login");
+        setForm(
+          (
+            previous
+          ) => ({
+            ...previous,
+
+            name:
+              userData?.name ||
+              previous.name,
+
+            phone:
+              userData?.phone ||
+              previous.phone,
+
+            location:
+              defaultLocation,
+          })
+        );
+      } catch (
+        userError
+      ) {
+        console.error(
+          "USER ERROR:",
+          userError
+        );
+
+        router.replace(
+          "/login?redirect=/checkout"
+        );
       } finally {
-        setUserLoading(false);
+        if (mounted) {
+          setUserLoading(
+            false
+          );
+        }
       }
     };
 
-    loadUserAndDefaultAddress();
+    loadUser();
+
+    return () => {
+      mounted = false;
+    };
   }, [router]);
 
-  // =====================
-  // LOAD DELIVERY ZONE
-  // =====================
+  // ====================================================
+  // LOAD DELIVERY ZONES
+  // ====================================================
+
   useEffect(() => {
+    if (userLoading) {
+      return;
+    }
+
+    let mounted = true;
+
     const loadZones = async () => {
       try {
-        const data = await getDeliveryZones();
-        const activeZones = Array.isArray(data) ? data.filter((z: any) => z.active) : [];
-        setZones(activeZones);
+        const response =
+          await getDeliveryZones();
 
-        processZonesAndLocation(form.location, activeZones, deliveryType);
-      } catch (error) {
-        console.log("ZONE ERROR", error);
+        if (!mounted) {
+          return;
+        }
+
+        const activeZones =
+          Array.isArray(response)
+            ? response.filter(
+                (zone: any) =>
+                  zone?.active !== false
+              )
+            : [];
+
+        setZones(
+          activeZones
+        );
+      } catch (
+        zoneError
+      ) {
+        console.error(
+          "ZONE ERROR:",
+          zoneError
+        );
+
+        setZones([]);
       }
     };
 
-    if (!userLoading) {
-      loadZones();
-    }
-  }, [userLoading, form.location]);
+    loadZones();
 
-  const setLocation = (data: any) => {
-    setForm(prev => {
-      const updatedLoc = data;
-      processZonesAndLocation(updatedLoc, zones, deliveryType);
-      return {
-        ...prev,
-        location: updatedLoc
+    return () => {
+      mounted = false;
+    };
+  }, [userLoading]);
+
+  useEffect(() => {
+    if (
+      zones.length === 0
+    ) {
+      return;
+    }
+
+    processZonesAndLocation(
+      form.location,
+      zones
+    );
+
+  }, [
+    zones,
+    form.location.district,
+    form.location.area,
+    form.location.formattedAddress,
+  ]);
+
+  const setLocation = (
+    locationData: any
+  ) => {
+    const updatedLocation: LocationData =
+      {
+        formattedAddress:
+          locationData
+            ?.formattedAddress ||
+          "",
+
+        division:
+          locationData
+            ?.division ||
+          "",
+
+        district:
+          locationData
+            ?.district ||
+          "",
+
+        area:
+          locationData
+            ?.area ||
+          "",
+
+        road:
+          locationData
+            ?.road ||
+          "",
+
+        latitude:
+          locationData
+            ?.latitude ||
+          "",
+
+        longitude:
+          locationData
+            ?.longitude ||
+          "",
+
+        googleMapLink:
+          locationData
+            ?.googleMapLink ||
+          "",
       };
-    });
-    setShowLocationModal(false);
-  };
 
-  const handleDeliveryTypeChange = (type: "regular" | "express") => {
-    setDeliveryType(type);
-    if (type === "express" && matchedExpressZone) {
-      setSelectedZone(matchedExpressZone._id);
-    } else if (matchedRegularZone) {
-      setSelectedZone(matchedRegularZone._id);
-    }
-  };
+    setForm(
+      (
+        previous
+      ) => ({
+        ...previous,
 
-  const continuePayment = () => {
-    setError("");
-
-    if (!form.name.trim()) {
-      setError("Please provide your full name for delivery.");
-      return;
-    }
-
-    if (!form.phone.trim()) {
-      setError("Please provide a valid contact number.");
-      return;
-    }
-
-    if (!form.location.latitude || !form.location.longitude) {
-      setError("Please pin your exact delivery location on the map.");
-      return;
-    }
-
-    if (!selectedZone) {
-      setError("Please select a valid delivery zone/method.");
-      return;
-    }
-
-    sessionStorage.setItem(
-      "checkoutData",
-      JSON.stringify({
-        ...form,
-        deliveryZone: selectedZone,
-        deliveryType
+        location:
+          updatedLocation,
       })
     );
 
-    router.push("/checkout/payment");
+    setShowLocationModal(
+      false
+    );
+
+    setError("");
   };
 
-  if (cartLoading || userLoading) {
+  const handleDeliveryTypeChange = (
+    type: DeliveryType
+  ) => {
+    if (
+      type === "express"
+    ) {
+      if (
+        !expressAvailable ||
+        !matchedExpressZone
+      ) {
+        return;
+      }
+
+      setDeliveryType(
+        "express"
+      );
+
+      setSelectedZone(
+        String(
+          matchedExpressZone?._id ||
+            ""
+        )
+      );
+
+      return;
+    }
+
+    setDeliveryType(
+      "regular"
+    );
+
+    if (
+      matchedRegularZone
+    ) {
+      setSelectedZone(
+        String(
+          matchedRegularZone?._id ||
+            ""
+        )
+      );
+    }
+  };
+
+  const regularFeeAmount =
+    useMemo(() => {
+      if (
+        !matchedRegularZone
+      ) {
+        return 60;
+      }
+
+      const freeDeliveryAbove =
+        Number(
+          matchedRegularZone
+            ?.freeDeliveryAbove
+        ) ||
+        Number(
+          matchedRegularZone
+            ?.minOrderAmount
+        ) ||
+        0;
+
+      if (
+        freeDeliveryAbove >
+          0 &&
+        subtotal >=
+          freeDeliveryAbove
+      ) {
+        return 0;
+      }
+
+      const fee =
+        Number(
+          matchedRegularZone
+            ?.deliveryFee
+        );
+
+      return Number.isFinite(
+        fee
+      )
+        ? fee
+        : 60;
+    }, [
+      matchedRegularZone,
+      subtotal,
+    ]);
+
+  const expressFeeAmount =
+    useMemo(() => {
+      if (
+        !matchedExpressZone
+      ) {
+        return 50;
+      }
+
+      const fee =
+        Number(
+          matchedExpressZone
+            ?.expressFee ??
+            matchedExpressZone
+              ?.expressDeliveryFee ??
+            matchedExpressZone
+              ?.charge ??
+            50
+        );
+
+      return Number.isFinite(
+        fee
+      )
+        ? fee
+        : 50;
+    }, [
+      matchedExpressZone,
+    ]);
+
+  const shippingFee =
+    useMemo(() => {
+      if (
+        deliveryType ===
+        "express"
+      ) {
+        return (
+          regularFeeAmount +
+          expressFeeAmount
+        );
+      }
+
+      return regularFeeAmount;
+    }, [
+      deliveryType,
+      regularFeeAmount,
+      expressFeeAmount,
+    ]);
+
+  const grandTotal =
+    useMemo(() => {
+      return (
+        subtotal +
+        shippingFee
+      );
+    }, [
+      subtotal,
+      shippingFee,
+    ]);
+
+  const continuePayment =
+    () => {
+      setError("");
+
+      if (
+        items.length === 0
+      ) {
+        setError(
+          "Your cart is empty."
+        );
+
+        return;
+      }
+
+      if (
+        !form.name.trim()
+      ) {
+        setError(
+          "Please provide your full name for delivery."
+        );
+
+        return;
+      }
+
+      if (
+        !form.phone.trim()
+      ) {
+        setError(
+          "Please provide a valid contact number."
+        );
+
+        return;
+      }
+
+      if (
+        !form.location
+          .latitude
+      ) {
+        setError(
+          "Please pin your exact delivery location on the map."
+        );
+
+        return;
+      }
+
+      if (
+        !form.location
+          .longitude
+      ) {
+        setError(
+          "Please pin your exact delivery location on the map."
+        );
+
+        return;
+      }
+
+      if (
+        !selectedZone
+      ) {
+        setError(
+          "Please select a valid delivery zone/method."
+        );
+
+        return;
+      }
+
+      if (
+        deliveryType ===
+          "express" &&
+        !expressAvailable
+      ) {
+        setError(
+          "Express delivery is not available for this location."
+        );
+
+        return;
+      }
+
+      const checkoutData =
+        {
+          name:
+            form.name,
+
+          phone:
+            form.phone,
+
+          country:
+            form.country,
+
+          location:
+            form.location,
+
+          deliveryZone:
+            selectedZone,
+
+          deliveryType,
+
+          subtotal,
+
+          regularDeliveryFee:
+            regularFeeAmount,
+
+          expressFee:
+            deliveryType ===
+            "express"
+              ? expressFeeAmount
+              : 0,
+
+          shippingFee,
+
+          grandTotal,
+        };
+
+      sessionStorage.setItem(
+        "checkoutData",
+        JSON.stringify(
+          checkoutData
+        )
+      );
+
+      router.push(
+        "/checkout/payment"
+      );
+    };
+
+  if (
+    cartLoading ||
+    userLoading
+  ) {
     return (
       <div className="flex min-h-screen items-center justify-center bg-zinc-50">
-        <div className="text-center space-y-3">
-          <Loader2 className="h-8 w-8 animate-spin mx-auto text-zinc-900" />
-          <p className="text-xs font-medium text-zinc-500 tracking-wide uppercase">Preparing Secure Checkout...</p>
+        <div className="space-y-3 text-center">
+          <Loader2 className="mx-auto h-8 w-8 animate-spin text-zinc-900" />
+          <p className="text-xs font-medium uppercase tracking-wide text-zinc-500">
+            Preparing Secure Checkout...
+          </p>
         </div>
       </div>
     );
   }
 
-  // =====================
-  // CALCULATED FEES LOGIC
-  // =====================
-  const getRawRegularFee = (zone: any) => {
-    if (!zone) return 60;
-    const freeDeliveryAbove = Number(zone.freeDeliveryAbove) || Number(zone.minOrderAmount) || 0;
-    if (freeDeliveryAbove > 0 && subtotal >= freeDeliveryAbove) {
-      return 0; 
-    }
-    return Number(zone.deliveryFee) ?? 60; 
-  };
-
-  const getRawExpressFee = (zone: any) => {
-    if (!zone) return 50;
-    return Number(zone.expressFee ?? zone.expressDeliveryFee ?? zone.charge ?? 50);
-  };
-
-  const regularFeeAmount = getRawRegularFee(matchedRegularZone);
-  const expressFeeAmount = getRawExpressFee(matchedExpressZone);
-
-  // টোটাল শিপিং ফি হিসাব
-  const shippingFee = deliveryType === "express" 
-    ? regularFeeAmount + expressFeeAmount
-    : regularFeeAmount;
-
-  const grandTotal = subtotal + shippingFee;
+  if (
+    items.length === 0
+  ) {
+    return (
+      <main className="flex min-h-screen items-center justify-center bg-zinc-50 px-4">
+        <div className="w-full max-w-md rounded-2xl border border-zinc-200 bg-white p-8 text-center shadow-sm">
+          <div className="mx-auto mb-4 flex h-14 w-14 items-center justify-center rounded-full bg-zinc-100">
+            <Truck className="text-zinc-500" size={24} />
+          </div>
+          <h1 className="text-lg font-bold text-zinc-900">
+            Your Cart Is Empty
+          </h1>
+          <p className="mt-2 text-sm text-zinc-500">
+            Add some products to your cart before continuing to checkout.
+          </p>
+          <button
+            type="button"
+            onClick={() =>
+              router.push(
+                "/shop"
+              )
+            }
+            className="mt-6 w-full rounded-xl bg-zinc-900 py-3 text-xs font-bold text-white transition hover:bg-zinc-800"
+          >
+            Continue Shopping
+          </button>
+        </div>
+      </main>
+    );
+  }
 
   return (
     <main className="min-h-screen bg-zinc-50/50 pb-20 pt-8 text-zinc-900 selection:bg-black selection:text-white">
       <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
-        
         <div className="mb-8">
           <CheckoutHeader />
           <div className="mt-4">
@@ -354,50 +1155,71 @@ export default function CheckoutPage() {
           </div>
         </div>
 
-        <div className="grid gap-8 lg:grid-cols-12 items-start">
-          
+        <div className="grid items-start gap-8 lg:grid-cols-12">
           <div className="space-y-6 lg:col-span-7 xl:col-span-8">
-            
-            <div className="rounded-2xl border border-zinc-200/80 bg-white p-6 shadow-sm/50 space-y-5">
+            <div className="space-y-5 rounded-2xl border border-zinc-200/80 bg-white p-6 shadow-sm">
               <div className="flex items-center justify-between border-b border-zinc-100 pb-4">
                 <div>
-                  <h2 className="text-sm font-bold tracking-tight flex items-center gap-2 text-zinc-900 uppercase">
-                    <MapPin size={16} className="text-zinc-600" /> Delivery Address & Details
+                  <h2 className="flex items-center gap-2 text-sm font-bold uppercase tracking-tight text-zinc-900">
+                    <MapPin className="text-zinc-600" size={16} />
+                    Delivery Address & Details
                   </h2>
-                  <p className="text-xs text-zinc-500 mt-0.5">Your default address is loaded below. You can update it anytime.</p>
+                  <p className="mt-0.5 text-xs text-zinc-500">
+                    Your default address is loaded below. You can update it anytime.
+                  </p>
                 </div>
-                
                 <button
                   type="button"
-                  onClick={() => setShowLocationModal(true)}
-                  className="flex items-center gap-1.5 bg-zinc-900 text-white text-xs font-bold px-4 py-2.5 rounded-xl transition-all hover:bg-zinc-800 shadow-sm active:scale-95"
+                  onClick={() =>
+                    setShowLocationModal(
+                      true
+                    )
+                  }
+                  className="flex items-center gap-1.5 rounded-xl bg-zinc-900 px-4 py-2.5 text-xs font-bold text-white shadow-sm transition-all hover:bg-zinc-800 active:scale-95"
                 >
-                  <Plus size={14} /> Add New Location
+                  <Plus size={14} />
+                  Add New Location
                 </button>
               </div>
 
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                <div className="space-y-2 bg-zinc-50/70 p-4 rounded-xl border border-zinc-100">
-                  <p className="text-[10px] font-bold text-zinc-400 uppercase tracking-wider">Recipient Contact</p>
+              <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+                <div className="space-y-2 rounded-xl border border-zinc-100 bg-zinc-50/70 p-4">
+                  <p className="text-[10px] font-bold uppercase tracking-wider text-zinc-400">
+                    Recipient Contact
+                  </p>
                   <div className="space-y-1">
-                    <p className="font-bold text-xs text-zinc-900 flex items-center gap-2">
-                      <User size={14} className="text-zinc-400" /> {form.name || "Name not provided"}
+                    <p className="flex items-center gap-2 text-xs font-bold text-zinc-900">
+                      <User className="text-zinc-400" size={14} />
+                      {form.name ||
+                        "Name not provided"}
                     </p>
-                    <p className="text-xs text-zinc-600 flex items-center gap-2">
-                      <Phone size={14} className="text-zinc-400" /> {form.phone || "Phone not provided"}
+                    <p className="flex items-center gap-2 text-xs text-zinc-600">
+                      <Phone className="text-zinc-400" size={14} />
+                      {form.phone ||
+                        "Phone not provided"}
                     </p>
                   </div>
                 </div>
 
-                <div className="space-y-2 bg-zinc-50/70 p-4 rounded-xl border border-zinc-100">
-                  <p className="text-[10px] font-bold text-zinc-400 uppercase tracking-wider">Default Delivery Address</p>
+                <div className="space-y-2 rounded-xl border border-zinc-100 bg-zinc-50/70 p-4">
+                  <p className="text-[10px] font-bold uppercase tracking-wider text-zinc-400">
+                    Delivery Address
+                  </p>
                   <div className="space-y-1">
-                    <p className="font-bold text-xs text-zinc-900 flex items-center gap-2">
-                      <MapPin size={14} className="text-zinc-400 shrink-0" /> 
-                      <span className="line-clamp-1">{form.location.district || "District not selected"}</span>
+                    <p className="flex items-center gap-2 text-xs font-bold text-zinc-900">
+                      <MapPin className="shrink-0 text-zinc-400" size={14} />
+                      <span className="line-clamp-1">
+                        {form.location
+                          .district ||
+                          "District not selected"}
+                      </span>
                     </p>
-                    <p className="text-xs text-zinc-500 line-clamp-2 leading-relaxed pl-5">
-                      {form.location.formattedAddress || form.location.area || "No address found. Click 'Add New Location'."}
+                    <p className="line-clamp-2 pl-5 text-xs leading-relaxed text-zinc-500">
+                      {form.location
+                        .formattedAddress ||
+                        form.location
+                          .area ||
+                        "No address found. Click 'Add New Location'."}
                     </p>
                   </div>
                 </div>
@@ -405,21 +1227,25 @@ export default function CheckoutPage() {
             </div>
 
             {showLocationModal && (
-              <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 p-4 backdrop-blur-md animate-fadeIn">
-                <div className="relative w-full max-w-2xl rounded-2xl bg-white p-6 shadow-2xl space-y-4 max-h-[90vh] overflow-y-auto">
-                  <div className="flex items-center justify-between border-b pb-3">
-                    <h3 className="text-sm font-bold flex items-center gap-2 text-zinc-900 uppercase">
-                      <MapPin size={16} className="text-zinc-900" /> Update / Pin New Location
+              <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 p-4 backdrop-blur-md">
+                <div className="relative max-h-[90vh] w-full max-w-2xl space-y-4 overflow-y-auto rounded-2xl bg-white p-6 shadow-2xl">
+                  <div className="flex items-center justify-between border-b border-zinc-100 pb-3">
+                    <h3 className="flex items-center gap-2 text-sm font-bold uppercase text-zinc-900">
+                      <MapPin size={16} />
+                      Update / Pin New Location
                     </h3>
                     <button
                       type="button"
-                      onClick={() => setShowLocationModal(false)}
-                      className="rounded-full p-2 text-zinc-400 hover:bg-zinc-100 transition-colors"
+                      onClick={() =>
+                        setShowLocationModal(
+                          false
+                        )
+                      }
+                      className="rounded-full p-2 text-zinc-400 transition hover:bg-zinc-100"
                     >
                       <XCircle size={18} />
                     </button>
                   </div>
-
                   <LocationPicker
                     location={form.location}
                     setLocation={setLocation}
@@ -428,246 +1254,180 @@ export default function CheckoutPage() {
               </div>
             )}
 
-            <div className="rounded-2xl border border-zinc-200/80 bg-white p-6 shadow-sm/50 space-y-4">
+            <div className="space-y-4 rounded-2xl border border-zinc-200/80 bg-white p-6 shadow-sm">
               <div>
-                <h2 className="text-sm font-bold tracking-tight flex items-center gap-2 text-zinc-900 uppercase">
-                  <Truck size={16} className="text-zinc-600" /> Choose Delivery Method
+                <h2 className="flex items-center gap-2 text-sm font-bold uppercase tracking-tight text-zinc-900">
+                  <Truck className="text-zinc-600" size={16} />
+                  Choose Delivery Method
                 </h2>
-                <p className="text-xs text-zinc-500 mt-0.5">Select standard speed or priority express shipment.</p>
+                <p className="mt-0.5 text-xs text-zinc-500">
+                  Select standard speed or priority express shipment.
+                </p>
               </div>
 
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                
-                <div
-                  onClick={() => handleDeliveryTypeChange("regular")}
-                  className={`p-4 rounded-xl border cursor-pointer transition-all flex flex-col justify-between gap-3 ${
-                    deliveryType === "regular"
+              <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+                <button
+                  type="button"
+                  onClick={() =>
+                    handleDeliveryTypeChange(
+                      "regular"
+                    )
+                  }
+                  className={`rounded-xl border p-4 text-left transition-all ${
+                    deliveryType ===
+                    "regular"
                       ? "border-zinc-900 bg-zinc-900/[0.02] ring-1 ring-zinc-900"
-                      : "border-zinc-200 hover:border-zinc-300 bg-white"
+                      : "border-zinc-200 bg-white hover:border-zinc-300"
                   }`}
                 >
                   <div className="flex items-center justify-between">
-                    <span className="font-bold text-xs text-zinc-900 flex items-center gap-2">
-                      <Truck size={15} className="text-blue-600" /> Regular Delivery
+                    <span className="flex items-center gap-2 text-xs font-bold text-zinc-900">
+                      <Truck className="text-blue-600" size={15} />
+                      Regular Delivery
                     </span>
-                    <span className="text-[10px] bg-blue-50 text-blue-700 font-bold px-2 py-0.5 rounded tracking-wide">
+                    <span className="rounded bg-blue-50 px-2 py-0.5 text-[10px] font-bold tracking-wide text-blue-700">
                       STANDARD
                     </span>
                   </div>
-                  <div className="text-xs text-zinc-600 space-y-1 pt-1">
+
+                  <div className="space-y-1 pt-3 text-xs text-zinc-600">
                     <p className="flex items-center gap-1.5">
-                      <Clock size={13} className="text-zinc-400" /> Estimated: <strong className="text-zinc-900">{matchedRegularZone?.estimatedDays || "3-5 Days"}</strong>
+                      <Clock className="text-zinc-400" size={13} />
+                      Estimated:
+                      <strong className="text-zinc-900">
+                        {matchedRegularZone
+                          ?.estimatedDays ||
+                          "3-5 Days"}
+                      </strong>
                     </p>
                     <p className="flex items-center gap-1.5">
-                      <MapPin size={13} className="text-zinc-400" /> Delivery Fee:{" "}
+                      <MapPin className="text-zinc-400" size={13} />
+                      Delivery Fee:
                       <strong className="text-zinc-900">
-                        {regularFeeAmount === 0 ? (
-                          <span className="text-emerald-600 font-bold">FREE</span>
+                        {regularFeeAmount ===
+                        0 ? (
+                          <span className="font-bold text-emerald-600">
+                            FREE
+                          </span>
                         ) : (
-                          formatPrice(regularFeeAmount)
+                          formatPrice(
+                            regularFeeAmount
+                          )
                         )}
                       </strong>
                     </p>
                   </div>
-                </div>
+                </button>
 
-                <div
-                  onClick={() => expressAvailable && handleDeliveryTypeChange("express")}
-                  className={`p-4 rounded-xl border transition-all flex flex-col justify-between gap-3 ${
-                    !expressAvailable 
-                      ? "opacity-50 bg-zinc-50/50 border-zinc-200 cursor-not-allowed" 
-                      : deliveryType === "express"
-                      ? "border-amber-500 bg-amber-50/30 ring-1 ring-amber-500 cursor-pointer"
-                      : "border-zinc-200 hover:border-zinc-300 bg-white cursor-pointer"
+                <button
+                  type="button"
+                  disabled={
+                    !expressAvailable
+                  }
+                  onClick={() =>
+                    handleDeliveryTypeChange(
+                      "express"
+                    )
+                  }
+                  className={`rounded-xl border p-4 text-left transition-all ${
+                    !expressAvailable
+                      ? "cursor-not-allowed border-zinc-200 bg-zinc-50/50 opacity-50"
+                      : deliveryType ===
+                        "express"
+                      ? "cursor-pointer border-amber-500 bg-amber-50/30 ring-1 ring-amber-500"
+                      : "cursor-pointer border-zinc-200 bg-white hover:border-zinc-300"
                   }`}
                 >
                   <div className="flex items-center justify-between">
-                    <span className="font-bold text-xs text-zinc-900 flex items-center gap-2">
-                      <Zap size={15} className="text-amber-500 fill-amber-500" /> Express (3 Hours)
+                    <span className="flex items-center gap-2 text-xs font-bold text-zinc-900">
+                      <Zap className="fill-amber-500 text-amber-500" size={15} />
+                      Express (3 Hours)
                     </span>
                     {expressAvailable ? (
-                      <span className="text-[10px] bg-amber-100 text-amber-800 font-bold px-2 py-0.5 rounded flex items-center gap-1 tracking-wide">
-                        <CheckCircle size={10} /> AVAILABLE
+                      <span className="flex items-center gap-1 rounded bg-amber-100 px-2 py-0.5 text-[10px] font-bold tracking-wide text-amber-800">
+                        <CheckCircle size={10} />
+                        AVAILABLE
                       </span>
                     ) : (
-                      <span className="text-[10px] bg-zinc-200 text-zinc-600 font-medium px-2 py-0.5 rounded flex items-center gap-1">
-                        <XCircle size={10} /> UNAVAILABLE
+                      <span className="flex items-center gap-1 rounded bg-zinc-200 px-2 py-0.5 text-[10px] font-medium text-zinc-600">
+                        <XCircle size={10} />
+                        UNAVAILABLE
                       </span>
                     )}
                   </div>
-                  <div className="text-xs text-zinc-600 space-y-1 pt-1">
+
+                  <div className="space-y-1 pt-3 text-xs text-zinc-600">
                     {expressAvailable ? (
                       <>
                         <p className="flex items-center gap-1.5">
-                          <Clock size={13} className="text-amber-500" /> Estimated: <strong className="text-zinc-900">{matchedExpressZone?.estimatedDays || "Within 3 Hours"}</strong>
+                          <Clock className="text-amber-500" size={13} />
+                          Estimated:
+                          <strong className="text-zinc-900">
+                            {matchedExpressZone
+                              ?.estimatedDays ||
+                              "Within 3 Hours"}
+                          </strong>
                         </p>
                         <p className="flex items-center gap-1.5">
-                          <MapPin size={13} className="text-amber-500" /> Delivery Fee:{" "}
+                          <MapPin className="text-amber-500" size={13} />
+                          Regular Delivery:
                           <strong className="text-zinc-900">
-                            {regularFeeAmount === 0 ? (
-                              <span className="text-emerald-600 font-bold">FREE</span>
+                            {regularFeeAmount ===
+                            0 ? (
+                              <span className="font-bold text-emerald-600">
+                                FREE
+                              </span>
                             ) : (
-                              formatPrice(regularFeeAmount)
+                              formatPrice(
+                                regularFeeAmount
+                              )
                             )}
                           </strong>
                         </p>
                         <p className="flex items-center gap-1.5">
-                          <Zap size={13} className="text-amber-500" /> Express Fee:{" "}
+                          <Zap className="text-amber-500" size={13} />
+                          Express Fee:
                           <strong className="text-zinc-900">
-                            {formatPrice(expressFeeAmount)}
+                            {formatPrice(
+                              expressFeeAmount
+                            )}
                           </strong>
                         </p>
                       </>
                     ) : (
-                      <p className="text-xs text-zinc-400 italic py-1">
+                      <p className="py-1 text-xs italic text-zinc-400">
                         Express delivery is currently not supported for this region.
                       </p>
                     )}
                   </div>
-                </div>
-
+                </button>
               </div>
             </div>
 
             {error && (
-              <div className="rounded-xl border border-red-200 bg-red-50 p-4 text-xs font-semibold text-red-600 flex items-center gap-2">
-                <XCircle size={16} className="shrink-0" />
-                <span>{error}</span>
+              <div className="flex items-center gap-2 rounded-xl border border-red-200 bg-red-50 p-4 text-xs font-semibold text-red-600">
+                <XCircle className="shrink-0" size={16} />
+                <span>
+                  {error}
+                </span>
               </div>
             )}
           </div>
 
-          <div className="lg:sticky lg:top-8 lg:col-span-5 xl:col-span-4 space-y-4">
-            <div className="rounded-2xl border border-zinc-200/80 bg-white p-6 shadow-sm/50 space-y-5">
-              <h2 className="text-sm font-bold text-zinc-900 uppercase tracking-tight border-b border-zinc-100 pb-3 flex items-center justify-between">
-                <span>Order Summary</span>
-                <span className="text-xs font-medium text-zinc-500">{items.length} {items.length === 1 ? 'Item' : 'Items'}</span>
-              </h2>
-
-              <div className="space-y-4 max-h-[280px] overflow-y-auto pr-1">
-                {items.map((item: any) => {
-                  const product = typeof item?.product === "object" && item?.product !== null ? item.product : {};
-                  
-                  const selectedSize = 
-                    item?.selectedSize || 
-                    item?.size || 
-                    item?.variantSize || 
-                    product?.selectedSize || 
-                    product?.size || 
-                    product?.capacity || 
-                    product?.storage ||
-                    "";
-
-                  const selectedColor = 
-                    item?.selectedColor || 
-                    item?.color || 
-                    item?.variantColor || 
-                    product?.selectedColor || 
-                    product?.color || 
-                    "";
-
-                  return (
-                    <div
-                      key={item._id || item.product}
-                      className="flex gap-3.5 border-b border-zinc-100 pb-3.5 last:border-0"
-                    >
-                      <div className="h-16 w-16 overflow-hidden rounded-xl bg-zinc-100 shrink-0 border border-zinc-100">
-                        <img
-                          src={
-                            item?.product?.images?.[0]?.url ||
-                            item?.product?.images?.[0] ||
-                            item?.image ||
-                            "/placeholder.png"
-                          }
-                          alt={item?.product?.name || item?.name || "Product"}
-                          className="h-full w-full object-cover"
-                        />
-                      </div>
-                      <div className="flex-1 min-w-0">
-                        <h3 className="font-bold text-xs line-clamp-2 text-zinc-900">
-                          {item.product?.name || item.name}
-                        </h3>
-
-                        {/* সিলেক্ট করা ভ্যারিয়েন্ট (সাইজ ও কালার) */}
-                        {(selectedSize || selectedColor) && (
-                          <div className="flex items-center gap-2 text-[11px] text-zinc-500 font-medium mt-1">
-                            {selectedSize && (
-                              <span>
-                                Size: <strong className="text-zinc-800">{selectedSize}</strong>
-                              </span>
-                            )}
-                            {selectedColor && (
-                              <span>
-                                Color: <strong className="text-zinc-800 capitalize">{selectedColor}</strong>
-                              </span>
-                            )}
-                          </div>
-                        )}
-
-                        <div className="mt-1.5 flex justify-between text-xs text-zinc-500 font-medium">
-                          <span>Qty: {item.quantity}</span>
-                          <span className="text-zinc-900 font-bold">
-                            {formatPrice(
-                              (item.product?.discountPrice || item.product?.price || item.price) * item.quantity
-                            )}
-                          </span>
-                        </div>
-                      </div>
-                    </div>
-                  );
-                })}
-              </div>
-
-              <div className="space-y-2 pt-3 border-t border-zinc-100 text-xs text-zinc-600">
-                <div className="flex justify-between">
-                  <span>Subtotal</span>
-                  <span className="font-semibold text-zinc-900">{formatPrice(subtotal)}</span>
-                </div>
-
-                {/* Regular Delivery Fee */}
-                <div className="flex justify-between items-center">
-                  <span>Estimated Delivery Fee</span>
-                  <span className="font-semibold text-zinc-900">
-                    {regularFeeAmount === 0 ? (
-                      <span className="text-emerald-600 font-bold">FREE</span>
-                    ) : (
-                      formatPrice(regularFeeAmount)
-                    )}
-                  </span>
-                </div>
-
-                {/* Express Fee (Only if Express selected) */}
-                {deliveryType === "express" && (
-                  <div className="flex justify-between items-center text-amber-700">
-                    <span>Express Fee</span>
-                    <span className="font-semibold">
-                      {formatPrice(expressFeeAmount)}
-                    </span>
-                  </div>
-                )}
-
-                <div className="flex justify-between text-sm font-bold text-zinc-900 pt-3 border-t border-dashed border-zinc-200">
-                  <span>Total Amount</span>
-                  <span className="text-base">{formatPrice(grandTotal)}</span>
-                </div>
-              </div>
-
-              <button
-                type="button"
-                onClick={continuePayment}
-                className="w-full rounded-xl bg-zinc-900 py-4 text-xs font-bold text-white transition-all hover:bg-zinc-800 shadow-md flex items-center justify-center gap-2 active:scale-[0.99] cursor-pointer"
-              >
-                <span>Continue to Payment</span>
-                <ArrowRight size={15} />
-              </button>
-
-              <div className="pt-2 flex items-center justify-center gap-1.5 text-[11px] text-zinc-400 font-medium text-center">
-                <Lock size={13} className="text-emerald-600" />
-                <span>Encrypted & Safe Checkout Experience</span>
-              </div>
-            </div>
+          <div className="space-y-4 lg:sticky lg:top-8 lg:col-span-5 xl:col-span-4">
+            <OrderSummary
+              deliveryType={deliveryType}
+              expressFee={expressFeeAmount}
+              items={items}
+              onPlaceOrder={continuePayment}
+              placeOrderLoading={false}
+              regularDeliveryFee={regularFeeAmount}
+              shipping={shippingFee}
+              showPlaceOrderButton={true}
+              subtotal={subtotal}
+              total={grandTotal}
+            />
           </div>
-
         </div>
       </div>
     </main>

@@ -17,10 +17,41 @@ import {
   mergeCart as mergeCartAPI,
 } from "@/services/cart.service";
 
+// ======================================================
+// TYPES
+// ======================================================
+
+type CartVariantData = {
+  sku?: string;
+  size?: string;
+  color?: string;
+  capacity?: string;
+  storage?: string;
+  price?: number;
+  discountPrice?: number;
+  stock?: number;
+  [key: string]: any;
+};
+
+type CartItemVariant = {
+  size?: string;
+  color?: string;
+
+  selectedSize?: string;
+  selectedColor?: string;
+
+  selectedVariantSKU?: string;
+
+  variant?: CartVariantData | null;
+};
+
 type CartContextType = {
   cart: any;
+
   totalItems: number;
+
   loading: boolean;
+
   cartLoading: boolean;
 
   addItem: (
@@ -30,11 +61,13 @@ type CartContextType = {
 
   updateItem: (
     productId: string,
-    quantity: number
+    quantity: number,
+    variant?: CartItemVariant
   ) => Promise<void>;
 
   removeItem: (
-    productId: string
+    productId: string,
+    variant?: CartItemVariant
   ) => Promise<void>;
 
   clearCart: () => Promise<void>;
@@ -42,51 +75,58 @@ type CartContextType = {
   refreshCart: () => Promise<void>;
 };
 
+// ======================================================
+// CONTEXT
+// ======================================================
+
 const CartContext =
   createContext<CartContextType | null>(null);
 
-const VARIANT_STORAGE_KEY = "cart_variant_metadata";
+// ======================================================
+// LOCAL STORAGE
+// ======================================================
 
-/* =========================================================
-   SAFE STRING HELPER
-========================================================= */
+const VARIANT_STORAGE_KEY =
+  "cart_variant_metadata";
 
-const cleanString = (value: any): string => {
-  if (value === undefined || value === null) {
+const GUEST_CART_KEY =
+  "guestCart";
+
+// ======================================================
+// HELPERS
+// ======================================================
+
+const cleanString = (
+  value: any
+): string => {
+  if (
+    value === undefined ||
+    value === null
+  ) {
     return "";
   }
 
   return String(value).trim();
 };
 
-/* =========================================================
-   VARIANT METADATA TYPE
-========================================================= */
-
-type VariantMetadata = {
-  productId: string;
-  selectedSize?: string;
-  selectedColor?: string;
-  selectedVariantSKU?: string;
-  variantId?: string;
-  price?: number;
-  stock?: number;
-};
-
-/* =========================================================
-   PROVIDER
-========================================================= */
+// ======================================================
+// PROVIDER
+// ======================================================
 
 export function CartProvider({
   children,
 }: {
   children: React.ReactNode;
 }) {
-  const [cart, setCart] = useState<any>({
-    items: [],
-  });
+  const [cart, setCart] =
+    useState<any>({
+      items: [],
+      total: 0,
+      totalItems: 0,
+    });
 
-  const [loading, setLoading] = useState(true);
+  const [loading, setLoading] =
+    useState(true);
 
   const [cartLoading, setCartLoading] =
     useState(false);
@@ -98,316 +138,284 @@ export function CartProvider({
         : null
     );
 
-  /* =======================================================
-     PRODUCT ID
-  ======================================================= */
+  // ====================================================
+  // PRODUCT ID
+  // ====================================================
 
-  const getProductId = useCallback((value: any) => {
-    if (!value) {
-      return null;
-    }
-
-    if (typeof value === "string") {
-      return value;
-    }
-
-    if (typeof value === "object") {
-      return (
-        value._id?.toString?.() ||
-        value.id?.toString?.() ||
-        value.productId?.toString?.() ||
-        null
-      );
-    }
-
-    return null;
-  }, []);
-
-  /* =======================================================
-     GET VARIANT LIST
-  ======================================================= */
-
-  const getVariantsList = useCallback((prod: any) => {
-    const rawVariants =
-      prod?.variants ||
-      prod?.itemVariants ||
-      prod?.productVariants ||
-      prod?.options ||
-      prod?.attributes ||
-      prod?.sizes ||
-      [];
-
-    if (Array.isArray(rawVariants)) {
-      return rawVariants;
-    }
-
-    if (
-      rawVariants &&
-      typeof rawVariants === "object"
-    ) {
-      return Object.values(rawVariants);
-    }
-
-    return [];
-  }, []);
-
-  /* =======================================================
-     FIND MATCHED VARIANT
-  ======================================================= */
-
-  const findMatchedVariant = useCallback(
-    (
-      prod: any,
-      size: string = "",
-      color: string = "",
-      sku: string = ""
-    ) => {
-      const variantsList =
-        getVariantsList(prod);
-
-      if (!variantsList.length) {
+  const getProductId = useCallback(
+    (value: any): string | null => {
+      if (!value) {
         return null;
       }
 
-      const cleanSize =
-        cleanString(size).toLowerCase();
+      if (typeof value === "string") {
+        return value;
+      }
 
-      const cleanColor =
-        cleanString(color).toLowerCase();
-
-      const cleanSku =
-        cleanString(sku).toLowerCase();
-
-      /* -----------------------------------------------
-         FIRST TRY SKU
-      ------------------------------------------------ */
-
-      if (cleanSku) {
-        const skuMatch = variantsList.find(
-          (v: any) => {
-            if (!v || typeof v === "string") {
-              return false;
-            }
-
-            const variantSku =
-              cleanString(
-                v.sku ||
-                  v.variantSku ||
-                  v.code
-              ).toLowerCase();
-
-            return (
-              variantSku &&
-              variantSku === cleanSku
-            );
-          }
+      if (typeof value === "object") {
+        return (
+          value?._id?.toString?.() ||
+          value?.id?.toString?.() ||
+          value?.productId?.toString?.() ||
+          null
         );
+      }
 
-        if (skuMatch) {
-          return skuMatch;
+      return null;
+    },
+    []
+  );
+
+  // ====================================================
+  // VARIANT LIST
+  // ====================================================
+
+  const getVariantsList =
+    useCallback((product: any): any[] => {
+      const rawVariants =
+        product?.variants ||
+        product?.itemVariants ||
+        product?.productVariants ||
+        [];
+
+      if (Array.isArray(rawVariants)) {
+        return rawVariants;
+      }
+
+      if (
+        rawVariants &&
+        typeof rawVariants === "object"
+      ) {
+        return Object.values(rawVariants);
+      }
+
+      return [];
+    }, []);
+
+  // ====================================================
+  // FIND VARIANT
+  // ====================================================
+
+  const findMatchedVariant =
+    useCallback(
+      (
+        product: any,
+        size: string = "",
+        color: string = "",
+        sku: string = ""
+      ): CartVariantData | null => {
+        const variants =
+          getVariantsList(product);
+
+        if (!variants.length) {
+          return null;
         }
-      }
 
-      /* -----------------------------------------------
-         SIZE + COLOR
-      ------------------------------------------------ */
+        const cleanSize =
+          cleanString(size).toLowerCase();
 
-      return (
-        variantsList.find((v: any) => {
-          if (!v) {
-            return false;
-          }
+        const cleanColor =
+          cleanString(color).toLowerCase();
 
-          if (typeof v === "string") {
-            return (
-              !cleanColor &&
-              cleanString(v)
-                .toLowerCase() === cleanSize
+        const cleanSKU =
+          cleanString(sku).toLowerCase();
+
+        if (cleanSKU) {
+          const skuMatch =
+            variants.find(
+              (variant: any) => {
+                if (
+                  !variant ||
+                  typeof variant === "string"
+                ) {
+                  return false;
+                }
+
+                const variantSKU =
+                  cleanString(
+                    variant?.sku ||
+                      variant?.SKU ||
+                      variant?.variantSKU ||
+                      variant?.variantSku ||
+                      variant?.code ||
+                      ""
+                  ).toLowerCase();
+
+                return (
+                  variantSKU ===
+                  cleanSKU
+                );
+              }
             );
+
+          if (skuMatch) {
+            return skuMatch;
           }
+        }
 
-          const vSize =
-            cleanString(
-              v.size ||
-                v.capacity ||
-                v.storage ||
-                v.ram ||
-                v.attributes?.size ||
-                v.attributes?.capacity ||
-                v.attributes?.storage ||
-                v.options?.find?.(
-                  (o: any) =>
-                    ["size", "storage", "capacity"]
-                      .includes(
-                        cleanString(
-                          o?.name
-                        ).toLowerCase()
-                      )
-                )?.value
-            ).toLowerCase();
+        if (
+          !cleanSize &&
+          !cleanColor
+        ) {
+          return null;
+        }
 
-          const vColor =
-            cleanString(
-              v.color ||
-                v.attributes?.color ||
-                v.options?.find?.(
-                  (o: any) =>
-                    cleanString(
-                      o?.name
-                    ).toLowerCase() ===
-                    "color"
-                )?.value
-            ).toLowerCase();
+        const match =
+          variants.find(
+            (variant: any) => {
+              if (
+                !variant ||
+                typeof variant === "string"
+              ) {
+                return false;
+              }
 
-          const sizeMatch =
-            !cleanSize ||
-            vSize === cleanSize;
+              const variantSize =
+                cleanString(
+                  variant?.size ||
+                    variant?.capacity ||
+                    variant?.storage ||
+                    variant?.attributes?.size ||
+                    variant?.attributes?.capacity ||
+                    variant?.attributes?.storage ||
+                    ""
+                ).toLowerCase();
 
-          const colorMatch =
-            !cleanColor ||
-            vColor === cleanColor;
+              const variantColor =
+                cleanString(
+                  variant?.color ||
+                    variant?.attributes?.color ||
+                    ""
+                ).toLowerCase();
 
-          return (
-            sizeMatch &&
-            colorMatch
-          );
-        }) || null
-      );
-    },
-    [getVariantsList]
-  );
+              const sizeMatch =
+                !cleanSize ||
+                variantSize ===
+                  cleanSize;
 
-  /* =======================================================
-     VARIANT STOCK
-  ======================================================= */
+              const colorMatch =
+                !cleanColor ||
+                variantColor ===
+                  cleanColor;
 
-  const getVariantStock = useCallback(
-    (
-      prod: any,
-      size: string = "",
-      color: string = "",
-      sku: string = ""
-    ) => {
-      const matched =
-        findMatchedVariant(
-          prod,
-          size,
-          color,
-          sku
-        );
-
-      if (
-        matched &&
-        (
-          matched.stock !== undefined ||
-          matched.quantity !== undefined
-        )
-      ) {
-        return Number(
-          matched.stock !== undefined
-            ? matched.stock
-            : matched.quantity
-        );
-      }
-
-      if (
-        prod?.stock !== undefined
-      ) {
-        return Number(prod.stock);
-      }
-
-      if (
-        prod?.inventory?.stock !== undefined
-      ) {
-        return Number(
-          prod.inventory.stock
-        );
-      }
-
-      return 10;
-    },
-    [findMatchedVariant]
-  );
-
-  /* =======================================================
-     VARIANT PRICE
-  ======================================================= */
-
-  const getVariantPrice = useCallback(
-    (
-      prod: any,
-      size: string = "",
-      color: string = "",
-      sku: string = ""
-    ) => {
-      const matched =
-        findMatchedVariant(
-          prod,
-          size,
-          color,
-          sku
-        );
-
-      if (matched) {
-        const discountPrice =
-          Number(
-            matched.discountPrice || 0
+              return (
+                sizeMatch &&
+                colorMatch
+              );
+            }
           );
 
-        const variantPrice =
-          Number(
-            matched.price || 0
-          );
+        return match || null;
+      },
+      [getVariantsList]
+    );
 
-        if (discountPrice > 0) {
+  // ====================================================
+  // VARIANT PRICE
+  // ====================================================
+
+  const getVariantPrice =
+    useCallback(
+      (
+        product: any,
+        variant?: CartVariantData | null
+      ): number => {
+        const discountPrice = Number(
+          variant?.discountPrice ?? product?.discountPrice ?? 0
+        );
+        const regularPrice = Number(
+          variant?.price ?? product?.price ?? product?.pricing?.price ?? 0
+        );
+
+        if (discountPrice > 0 && discountPrice < regularPrice) {
           return discountPrice;
         }
 
-        if (variantPrice > 0) {
-          return variantPrice;
+        return regularPrice > 0 ? regularPrice : discountPrice;
+      },
+      []
+    );
+
+  // ====================================================
+  // VARIANT STOCK
+  // ====================================================
+
+  const getVariantStock =
+    useCallback(
+      (
+        product: any,
+        variant?: CartVariantData | null
+      ): number => {
+        if (
+          variant?.stock !==
+            undefined &&
+          variant?.stock !== null
+        ) {
+          return Number(
+            variant.stock
+          );
         }
-      }
 
-      const productDiscount =
-        Number(
-          prod?.discountPrice || 0
-        );
+        if (
+          product?.stock !==
+            undefined
+        ) {
+          return Number(
+            product.stock
+          );
+        }
 
-      if (productDiscount > 0) {
-        return productDiscount;
-      }
+        if (
+          product?.inventory?.stock !==
+            undefined
+        ) {
+          return Number(
+            product.inventory.stock
+          );
+        }
 
-      return Number(
-        prod?.price ||
-          prod?.pricing?.price ||
-          0
-      );
-    },
-    [findMatchedVariant]
-  );
+        return 0;
+      },
+      []
+    );
 
-  /* =======================================================
-     LOCAL VARIANT METADATA
-  ======================================================= */
+  // ====================================================
+  // LOCAL VARIANT METADATA
+  // ====================================================
+
+  type VariantMetadata = {
+    productId: string;
+    selectedSize?: string;
+    selectedColor?: string;
+    selectedVariantSKU?: string;
+    variantId?: string;
+    price?: number;
+    stock?: number;
+    variant?: CartVariantData | null;
+  };
 
   const getVariantMetadata =
-    useCallback((): VariantMetadata[] => {
-      if (
-        typeof window === "undefined"
-      ) {
-        return [];
-      }
+    useCallback(
+      (): VariantMetadata[] => {
+        if (
+          typeof window ===
+          "undefined"
+        ) {
+          return [];
+        }
 
-      try {
-        return JSON.parse(
-          localStorage.getItem(
-            VARIANT_STORAGE_KEY
-          ) || "[]"
-        );
-      } catch {
-        return [];
-      }
-    }, []);
+        try {
+          return JSON.parse(
+            localStorage.getItem(
+              VARIANT_STORAGE_KEY
+            ) || "[]"
+          );
+        } catch {
+          return [];
+        }
+      },
+      []
+    );
 
   const saveVariantMetadata =
     useCallback(
@@ -415,7 +423,8 @@ export function CartProvider({
         metadata: VariantMetadata
       ) => {
         if (
-          typeof window === "undefined"
+          typeof window ===
+          "undefined"
         ) {
           return;
         }
@@ -425,13 +434,23 @@ export function CartProvider({
             getVariantMetadata();
 
           const key =
-            `${metadata.productId}-${metadata.selectedSize || ""}-${metadata.selectedColor || ""}-${metadata.selectedVariantSKU || ""}`;
+            [
+              metadata.productId,
+              metadata.selectedSize || "",
+              metadata.selectedColor || "",
+              metadata.selectedVariantSKU || "",
+            ].join("__");
 
           const filtered =
             existing.filter(
               (item) => {
                 const itemKey =
-                  `${item.productId}-${item.selectedSize || ""}-${item.selectedColor || ""}-${item.selectedVariantSKU || ""}`;
+                  [
+                    item.productId,
+                    item.selectedSize || "",
+                    item.selectedColor || "",
+                    item.selectedVariantSKU || "",
+                  ].join("__");
 
                 return (
                   itemKey !== key
@@ -439,15 +458,19 @@ export function CartProvider({
               }
             );
 
-          filtered.push(metadata);
+          filtered.push(
+            metadata
+          );
 
           localStorage.setItem(
             VARIANT_STORAGE_KEY,
-            JSON.stringify(filtered)
+            JSON.stringify(
+              filtered
+            )
           );
         } catch (error) {
           console.log(
-            "SAVE VARIANT METADATA ERROR",
+            "SAVE VARIANT METADATA ERROR:",
             error
           );
         }
@@ -455,16 +478,16 @@ export function CartProvider({
       [getVariantMetadata]
     );
 
-  /* =======================================================
-     FIND LOCAL VARIANT METADATA
-  ======================================================= */
+  // ====================================================
+  // FIND LOCAL VARIANT
+  // ====================================================
 
   const findLocalVariantMetadata =
     useCallback(
       (
         productId: string,
         item: any
-      ) => {
+      ): VariantMetadata | null => {
         const metadata =
           getVariantMetadata();
 
@@ -472,38 +495,45 @@ export function CartProvider({
           return null;
         }
 
+        const selectedSKU =
+          cleanString(
+            item?.selectedVariantSKU ||
+              item?.variant?.sku ||
+              item?.sku ||
+              ""
+          );
+
         const selectedSize =
           cleanString(
             item?.selectedSize ||
               item?.size ||
-              item?.variantSize
+              item?.variant?.size ||
+              item?.variant?.capacity ||
+              item?.variant?.storage ||
+              ""
           );
 
         const selectedColor =
           cleanString(
             item?.selectedColor ||
               item?.color ||
-              item?.variantColor
+              item?.variant?.color ||
+              ""
           );
-
-        const selectedSKU =
-          cleanString(
-            item?.selectedVariantSKU ||
-              item?.variantSku ||
-              item?.sku
-          );
-
-        /* SKU first */
 
         if (selectedSKU) {
           const skuMatch =
             metadata.find(
-              (m) =>
-                m.productId ===
-                  productId &&
-                m.selectedVariantSKU &&
-                m.selectedVariantSKU
-                  .toLowerCase() ===
+              (meta) =>
+                String(
+                  meta.productId
+                ) ===
+                  String(
+                    productId
+                  ) &&
+                cleanString(
+                  meta.selectedVariantSKU
+                ).toLowerCase() ===
                   selectedSKU.toLowerCase()
             );
 
@@ -512,40 +542,48 @@ export function CartProvider({
           }
         }
 
-        /* Size + Color */
-
-        return (
+        const sizeColorMatch =
           metadata.find(
-            (m) =>
-              m.productId ===
-                productId &&
+            (meta) =>
+              String(
+                meta.productId
+              ) ===
+                String(
+                  productId
+                ) &&
               cleanString(
-                m.selectedSize
+                meta.selectedSize
               ).toLowerCase() ===
                 selectedSize.toLowerCase() &&
               cleanString(
-                m.selectedColor
+                meta.selectedColor
               ).toLowerCase() ===
                 selectedColor.toLowerCase()
-          ) || null
+          );
+
+        return (
+          sizeColorMatch ||
+          null
         );
       },
       [getVariantMetadata]
     );
 
-  /* =======================================================
-     GET ITEM VARIANT DATA
-  ======================================================= */
+  // ====================================================
+  // EXTRACT VARIANT DATA
+  // ====================================================
 
   const extractVariantData =
     useCallback(
       (
         item: any,
-        prod: any
+        product: any
       ) => {
         const productId =
-          getProductId(prod) ||
-          getProductId(item?.product);
+          getProductId(
+            item?.product
+          ) ||
+          getProductId(product);
 
         const localMetadata =
           productId
@@ -555,19 +593,17 @@ export function CartProvider({
               )
             : null;
 
+        const backendVariant =
+          item?.variant ||
+          null;
+
         const selectedSize =
           cleanString(
             item?.selectedSize ||
               item?.size ||
-              item?.variantSize ||
-              item?.capacity ||
-              item?.storage ||
-              item?.attributes?.size ||
-              prod?.selectedSize ||
-              prod?.size ||
-              prod?.capacity ||
-              prod?.storage ||
-              prod?.attributes?.size ||
+              backendVariant?.size ||
+              backendVariant?.capacity ||
+              backendVariant?.storage ||
               localMetadata?.selectedSize ||
               ""
           );
@@ -576,11 +612,7 @@ export function CartProvider({
           cleanString(
             item?.selectedColor ||
               item?.color ||
-              item?.variantColor ||
-              item?.attributes?.color ||
-              prod?.selectedColor ||
-              prod?.color ||
-              prod?.attributes?.color ||
+              backendVariant?.color ||
               localMetadata?.selectedColor ||
               ""
           );
@@ -588,9 +620,7 @@ export function CartProvider({
         const selectedVariantSKU =
           cleanString(
             item?.selectedVariantSKU ||
-              item?.variantSku ||
-              item?.variantSKU ||
-              item?.sku ||
+              backendVariant?.sku ||
               localMetadata?.selectedVariantSKU ||
               ""
           );
@@ -599,6 +629,7 @@ export function CartProvider({
           selectedSize,
           selectedColor,
           selectedVariantSKU,
+          backendVariant,
           localMetadata,
         };
       },
@@ -608,202 +639,217 @@ export function CartProvider({
       ]
     );
 
-  /* =======================================================
-     NORMALIZE CART ITEMS
-  ======================================================= */
+  // ====================================================
+  // CREATE VARIANT KEY
+  // ====================================================
+
+  const getVariantKey =
+    useCallback(
+      (
+        productId: string,
+        selectedSize: string,
+        selectedColor: string,
+        selectedSKU: string
+      ) => {
+        const sku =
+          cleanString(
+            selectedSKU
+          ).toLowerCase();
+
+        const size =
+          cleanString(
+            selectedSize
+          ).toLowerCase();
+
+        const color =
+          cleanString(
+            selectedColor
+          ).toLowerCase();
+
+        if (sku) {
+          return `${productId}__sku__${sku}`;
+        }
+
+        return `${productId}__size__${size}__color__${color}`;
+      },
+      []
+    );
+
+  // ====================================================
+  // NORMALIZE CART ITEMS
+  // ====================================================
 
   const normalizeCartItems =
     useCallback(
       (items: any[] = []) => {
         const mergedMap =
-          new Map();
+          new Map<string, any>();
 
-        (items || []).forEach(
-          (item: any) => {
-            const prod =
-              typeof item?.product ===
-                "object" &&
-              item?.product !== null
-                ? item.product
-                : {};
+        for (
+          const item of items
+        ) {
+          const product =
+            typeof item?.product ===
+              "object" &&
+            item?.product !== null
+              ? item.product
+              : {};
 
-            const prodId =
-              getProductId(
-                item?.product
+          const productId =
+            getProductId(
+              item?.product
+            );
+
+          if (!productId) {
+            continue;
+          }
+
+          const {
+            selectedSize,
+            selectedColor,
+            selectedVariantSKU,
+            backendVariant,
+            localMetadata,
+          } =
+            extractVariantData(
+              item,
+              product
+            );
+
+          let finalVariant =
+            backendVariant ||
+            localMetadata?.variant ||
+            null;
+
+          if (!finalVariant) {
+            finalVariant =
+              findMatchedVariant(
+                product,
+                selectedSize,
+                selectedColor,
+                selectedVariantSKU
               );
+          }
 
-            if (!prodId) {
-              return;
-            }
+          const variantStock =
+            getVariantStock(
+              product,
+              finalVariant
+            );
 
-            const {
+          const properVariantPrice = getVariantPrice(product, finalVariant);
+          const itemPrice = properVariantPrice > 0 ? properVariantPrice : Number(item?.price || 0);
+
+          const quantity =
+            Number(
+              item?.quantity || 1
+            );
+
+          const variantId =
+            finalVariant?._id ||
+            finalVariant?.id ||
+            localMetadata?.variantId ||
+            null;
+
+          const formattedProduct =
+            {
+              ...product,
+
+              _id:
+                product?._id ||
+                productId,
+
+              name:
+                product?.name ||
+                "Product",
+
+              images:
+                product?.images || [],
+
+              price:
+                itemPrice,
+
+              stock:
+                variantStock,
+
+              selectedSize,
+
+              selectedColor,
+
+              selectedVariantSKU,
+
+              variantId,
+
+              variant:
+                finalVariant,
+            };
+
+          const uniqueKey =
+            getVariantKey(
+              productId,
               selectedSize,
               selectedColor,
+              selectedVariantSKU
+            );
+
+          const normalizedItem =
+            {
+              ...item,
+
+              product:
+                formattedProduct,
+
+              quantity,
+
+              price:
+                itemPrice,
+
+              size:
+                selectedSize,
+
+              color:
+                selectedColor,
+
+              selectedSize,
+
+              selectedColor,
+
               selectedVariantSKU,
-            } =
-              extractVariantData(
-                item,
-                prod
-              );
 
-            const matchedVariant =
-              findMatchedVariant(
-                prod,
-                selectedSize,
-                selectedColor,
-                selectedVariantSKU
-              );
+              variant:
+                finalVariant,
 
-            const variantStock =
-              getVariantStock(
-                prod,
-                selectedSize,
-                selectedColor,
-                selectedVariantSKU
-              );
+              variantId,
 
-            const variantPrice =
-              getVariantPrice(
-                prod,
-                selectedSize,
-                selectedColor,
-                selectedVariantSKU
-              );
+              stock:
+                variantStock,
+            };
 
-            const itemStock =
-              item?.stock !== undefined
-                ? Number(item.stock)
-                : variantStock;
-
-            const itemPrice =
-              Number(
-                item?.price ||
-                  variantPrice ||
-                  prod?.discountPrice ||
-                  prod?.price ||
-                  0
-              );
-
-            const itemQty =
-              Number(
-                item?.quantity || 1
-              );
-
-            const formattedProduct =
-              {
-                ...prod,
-
-                _id:
-                  prod?._id ||
-                  prodId,
-
-                name:
-                  prod?.name ||
-                  "Product",
-
-                images:
-                  prod?.images || [],
-
-                price:
-                  itemPrice,
-
-                stock:
-                  itemStock,
-
-                /* Keep selected variant inside product too */
-
-                selectedSize,
-
-                selectedColor,
-
-                selectedVariantSKU,
-
-                variantId:
-                  matchedVariant?._id ||
-                  matchedVariant?.id ||
-                  null,
-              };
-
-            /*
-             * IMPORTANT:
-             *
-             * Same product + different variant
-             * should be different cart entries.
-             */
-
-            const uniqueKey =
-              [
-                prodId,
-                selectedSize
-                  .toLowerCase(),
-                selectedColor
-                  .toLowerCase(),
-                selectedVariantSKU
-                  .toLowerCase(),
-              ].join("-");
-
-            if (
-              mergedMap.has(
+          if (
+            mergedMap.has(
+              uniqueKey
+            )
+          ) {
+            const existing =
+              mergedMap.get(
                 uniqueKey
-              )
-            ) {
-              const existing =
-                mergedMap.get(
-                  uniqueKey
-                );
-
-              existing.quantity +=
-                itemQty;
-            } else {
-              mergedMap.set(
-                uniqueKey,
-                {
-                  ...item,
-
-                  product:
-                    formattedProduct,
-
-                  selectedSize,
-
-                  selectedColor,
-
-                  selectedVariantSKU,
-
-                  stock:
-                    itemStock,
-
-                  price:
-                    itemPrice,
-
-                  quantity:
-                    itemQty,
-
-                  variantId:
-                    matchedVariant?._id ||
-                    matchedVariant?.id ||
-                    null,
-                }
               );
-            }
+
+            existing.quantity =
+              Number(
+                existing.quantity ||
+                  0
+              ) + quantity;
+          } else {
+            mergedMap.set(
+              uniqueKey,
+              normalizedItem
+            );
           }
-        );
+        }
 
         return Array.from(
           mergedMap.values()
-        ).map(
-          (entry: any) => ({
-            ...entry,
-
-            quantity:
-              Number(
-                entry.quantity || 1
-              ),
-
-            price:
-              Number(
-                entry.price || 0
-              ),
-          })
         );
       },
       [
@@ -812,12 +858,13 @@ export function CartProvider({
         findMatchedVariant,
         getVariantStock,
         getVariantPrice,
+        getVariantKey,
       ]
     );
 
-  /* =======================================================
-     UPDATE CART STATE
-  ======================================================= */
+  // ====================================================
+  // UPDATE CART STATE
+  // ====================================================
 
   const updateCartState =
     useCallback(
@@ -830,7 +877,7 @@ export function CartProvider({
 
         const formattedItems =
           normalizeCartItems(
-            rawCart.items || []
+            rawCart?.items || []
           );
 
         const total =
@@ -841,10 +888,10 @@ export function CartProvider({
             ) =>
               sum +
               Number(
-                item.price || 0
+                item?.price || 0
               ) *
                 Number(
-                  item.quantity || 0
+                  item?.quantity || 0
                 ),
             0
           );
@@ -857,32 +904,28 @@ export function CartProvider({
             ) =>
               sum +
               Number(
-                item.quantity || 0
+                item?.quantity || 0
               ),
             0
           );
 
-        setCart(
-          (prev: any) => ({
-            ...prev,
+        setCart({
+          ...rawCart,
 
-            ...rawCart,
+          items:
+            formattedItems,
 
-            items:
-              formattedItems,
+          total,
 
-            total,
-
-            totalItems,
-          })
-        );
+          totalItems,
+        });
       },
       [normalizeCartItems]
     );
 
-  /* =======================================================
-     GUEST CART
-  ======================================================= */
+  // ====================================================
+  // GUEST CART SAVE
+  // ====================================================
 
   const saveGuestCart =
     useCallback(
@@ -895,133 +938,16 @@ export function CartProvider({
         }
 
         localStorage.setItem(
-          "guestCart",
+          GUEST_CART_KEY,
           JSON.stringify(items)
         );
       },
       []
     );
 
-  const normalizeGuestCartItems =
-    useCallback(
-      (items: any[] = []) => {
-        const mergedMap =
-          new Map();
-
-        (items || []).forEach(
-          (item: any) => {
-            const product =
-              item?.product || {};
-
-            const productId =
-              getProductId(
-                product
-              );
-
-            if (!productId) {
-              return;
-            }
-
-            const {
-              selectedSize,
-              selectedColor,
-              selectedVariantSKU,
-            } =
-              extractVariantData(
-                item,
-                product
-              );
-
-            const quantity =
-              Number(
-                item.quantity || 1
-              );
-
-            const variantStock =
-              item?.stock !== undefined
-                ? Number(item.stock)
-                : getVariantStock(
-                    product,
-                    selectedSize,
-                    selectedColor,
-                    selectedVariantSKU
-                  );
-
-            const variantPrice =
-              getVariantPrice(
-                product,
-                selectedSize,
-                selectedColor,
-                selectedVariantSKU
-              );
-
-            const price =
-              Number(
-                item?.price ||
-                  variantPrice ||
-                  0
-              );
-
-            const uniqueKey =
-              [
-                productId,
-                selectedSize
-                  .toLowerCase(),
-                selectedColor
-                  .toLowerCase(),
-                selectedVariantSKU
-                  .toLowerCase(),
-              ].join("-");
-
-            if (
-              mergedMap.has(
-                uniqueKey
-              )
-            ) {
-              const existing =
-                mergedMap.get(
-                  uniqueKey
-                );
-
-              existing.quantity +=
-                quantity;
-            } else {
-              mergedMap.set(
-                uniqueKey,
-                {
-                  ...item,
-
-                  product,
-
-                  selectedSize,
-
-                  selectedColor,
-
-                  selectedVariantSKU,
-
-                  stock:
-                    variantStock,
-
-                  price,
-
-                  quantity,
-                }
-              );
-            }
-          }
-        );
-
-        return Array.from(
-          mergedMap.values()
-        );
-      },
-      [
-        getProductId,
-        extractVariantData,
-        getVariantStock,
-        getVariantPrice,
-      ]
-    );
+  // ====================================================
+  // GET GUEST CART
+  // ====================================================
 
   const getGuestCart =
     useCallback(() => {
@@ -1036,32 +962,35 @@ export function CartProvider({
         const raw =
           JSON.parse(
             localStorage.getItem(
-              "guestCart"
+              GUEST_CART_KEY
             ) || "[]"
           );
 
-        return normalizeGuestCartItems(
+        return normalizeCartItems(
           raw
         );
       } catch {
         return [];
       }
-    }, [
-      normalizeGuestCartItems,
-    ]);
+    }, [normalizeCartItems]);
 
-  /* =======================================================
-     REFRESH CART
-  ======================================================= */
+  // ====================================================
+  // REFRESH CART
+  // ====================================================
 
   const refreshCart =
     useCallback(
       async () => {
         try {
+          setLoading(true);
+
           const token =
-            localStorage.getItem(
-              "token"
-            );
+            typeof window !==
+            "undefined"
+              ? localStorage.getItem(
+                  "token"
+                )
+              : null;
 
           if (token) {
             const data =
@@ -1070,10 +999,6 @@ export function CartProvider({
             updateCartState(
               data
             );
-
-            /*
-             * Merge guest cart
-             */
 
             const guestItems =
               getGuestCart();
@@ -1092,43 +1017,38 @@ export function CartProvider({
                   mergedData?.cart
                 ) {
                   updateCartState(
-                    mergedData.cart
+                    mergedData
                   );
                 }
 
                 localStorage.removeItem(
-                  "guestCart"
-                );
-
-                window.dispatchEvent(
-                  new Event(
-                    "cart:updated"
-                  )
+                  GUEST_CART_KEY
                 );
               } catch (
                 mergeError
               ) {
                 console.log(
-                  "MERGE GUEST CART ERROR",
+                  "MERGE GUEST CART ERROR:",
                   mergeError
                 );
               }
             }
           } else {
-            const items =
+            const guestItems =
               getGuestCart();
 
             saveGuestCart(
-              items
+              guestItems
             );
 
             updateCartState({
-              items,
+              items:
+                guestItems,
             });
           }
         } catch (error) {
           console.log(
-            "GET CART ERROR",
+            "REFRESH CART ERROR:",
             error
           );
 
@@ -1148,9 +1068,9 @@ export function CartProvider({
       ]
     );
 
-  /* =======================================================
-     AUTH CHANGE
-  ======================================================= */
+  // ====================================================
+  // AUTH CHANGE
+  // ====================================================
 
   useEffect(() => {
     refreshCart();
@@ -1162,19 +1082,13 @@ export function CartProvider({
   useEffect(() => {
     const syncAuthToken =
       () => {
-        setAuthToken(
+        const token =
           localStorage.getItem(
             "token"
-          )
-        );
-      };
+          );
 
-    const handleAuthChange =
-      () => {
-        syncAuthToken();
+        setAuthToken(token);
       };
-
-    syncAuthToken();
 
     window.addEventListener(
       "storage",
@@ -1188,8 +1102,10 @@ export function CartProvider({
 
     window.addEventListener(
       "auth-change",
-      handleAuthChange
+      syncAuthToken
     );
+
+    syncAuthToken();
 
     return () => {
       window.removeEventListener(
@@ -1204,14 +1120,14 @@ export function CartProvider({
 
       window.removeEventListener(
         "auth-change",
-        handleAuthChange
+        syncAuthToken
       );
     };
   }, []);
 
-  /* =======================================================
-     ADD ITEM
-  ======================================================= */
+  // ====================================================
+  // ADD ITEM
+  // ====================================================
 
   const addItem =
     async (
@@ -1227,22 +1143,15 @@ export function CartProvider({
           );
 
         const productId =
-          typeof product ===
-          "string"
-            ? product
-            : product?._id ||
-              product?.productId;
+          getProductId(product);
 
         if (!productId) {
           console.log(
             "ADD CART ERROR: Product ID missing"
           );
+
           return;
         }
-
-        /* -----------------------------------------------
-           SELECTED VARIANT
-        ------------------------------------------------ */
 
         const selectedSize =
           cleanString(
@@ -1250,6 +1159,9 @@ export function CartProvider({
               product?.size ||
               product?.capacity ||
               product?.storage ||
+              product?.variant?.size ||
+              product?.variant?.capacity ||
+              product?.variant?.storage ||
               ""
           );
 
@@ -1257,6 +1169,7 @@ export function CartProvider({
           cleanString(
             product?.selectedColor ||
               product?.color ||
+              product?.variant?.color ||
               ""
           );
 
@@ -1265,17 +1178,9 @@ export function CartProvider({
             product?.selectedVariantSKU ||
               product?.variantSku ||
               product?.variantSKU ||
+              product?.variant?.sku ||
               ""
           );
-
-        const variantId =
-          product?.variantId ||
-          product?.selectedVariantId ||
-          "";
-
-        /* -----------------------------------------------
-           VARIANT
-        ------------------------------------------------ */
 
         const matchedVariant =
           findMatchedVariant(
@@ -1285,31 +1190,25 @@ export function CartProvider({
             selectedVariantSKU
           );
 
+        const finalVariant =
+          product?.variant ||
+          matchedVariant ||
+          null;
+
+        const itemPrice = getVariantPrice(product, finalVariant);
+
         const variantStock =
           getVariantStock(
             product,
-            selectedSize,
-            selectedColor,
-            selectedVariantSKU
+            finalVariant
           );
 
-        const itemPrice =
-          Number(
-            product?.price ||
-              matchedVariant?.discountPrice ||
-              matchedVariant?.price ||
-              getVariantPrice(
-                product,
-                selectedSize,
-                selectedColor,
-                selectedVariantSKU
-              ) ||
-              0
-          );
-
-        /* -----------------------------------------------
-           SAVE VARIANT METADATA LOCALLY
-        ------------------------------------------------ */
+        const variantId =
+          product?.variantId ||
+          product?.selectedVariantId ||
+          finalVariant?._id ||
+          finalVariant?.id ||
+          "";
 
         saveVariantMetadata({
           productId:
@@ -1322,135 +1221,147 @@ export function CartProvider({
           selectedVariantSKU,
 
           variantId:
-            String(variantId || ""),
+            String(
+              variantId || ""
+            ),
 
           price:
             itemPrice,
 
           stock:
             variantStock,
+
+          variant:
+            finalVariant,
         });
 
-        /* =================================================
-           LOGGED IN USER
-        ================================================= */
-
         if (token) {
-          /*
-           * Existing API is still:
-           *
-           * addCartAPI(productId, quantity)
-           *
-           * So we keep it unchanged here.
-           *
-           * Variant metadata is stored locally and merged
-           * with the API cart response.
-           */
+          const variantData: CartItemVariant =
+            {
+              size:
+                selectedSize,
+
+              color:
+                selectedColor,
+
+              selectedSize,
+
+              selectedColor,
+
+              selectedVariantSKU,
+
+              variant:
+                finalVariant,
+            };
 
           const data =
             await addCartAPI(
               productId,
-              quantity
+              quantity,
+              variantData
             );
 
-          /*
-           * Before updating cart state,
-           * inject selected variant into returned item.
-           */
-
-          if (
-            data?.cart?.items
-          ) {
-            const updatedItems =
-              data.cart.items.map(
-                (item: any) => {
-                  const itemProductId =
-                    getProductId(
-                      item?.product
-                    );
-
-                  if (
-                    String(
-                      itemProductId
-                    ) ===
-                    String(
-                      productId
-                    )
-                  ) {
-                    return {
-                      ...item,
-
-                      selectedSize,
-
-                      selectedColor,
-
-                      selectedVariantSKU,
-
-                      variantId,
-
-                      price:
-                        itemPrice ||
-                        item.price,
-                    };
-                  }
-
-                  return item;
-                }
-              );
-
-            updateCartState({
-              ...data,
-
-              cart: {
-                ...data.cart,
-
-                items:
-                  updatedItems,
-              },
-            });
-          } else {
-            updateCartState(
-              data
-            );
-          }
-        }
-
-        /* =================================================
-           GUEST USER
-        ================================================= */
-
-        else {
-          const items =
+          updateCartState(
+            data
+          );
+        } else {
+          const existingItems =
             getGuestCart();
 
-          const normalizedItems =
-            [...items];
+          const newItem = {
+            product:
+              typeof product ===
+              "object"
+                ? product
+                : {
+                    _id:
+                      productId,
+
+                    name:
+                      "Product",
+
+                    images:
+                      [],
+
+                    price:
+                      itemPrice,
+
+                    stock:
+                      variantStock,
+                  },
+
+            quantity,
+
+            price:
+              itemPrice,
+
+            size:
+              selectedSize,
+
+            color:
+              selectedColor,
+
+            selectedSize,
+
+            selectedColor,
+
+            selectedVariantSKU,
+
+            variant:
+              finalVariant,
+
+            variantId,
+
+            stock:
+              variantStock,
+          };
+
+          const newKey =
+            getVariantKey(
+              String(
+                productId
+              ),
+              selectedSize,
+              selectedColor,
+              selectedVariantSKU
+            );
 
           const existingIndex =
-            normalizedItems.findIndex(
+            existingItems.findIndex(
               (item: any) => {
-                const id =
+                const itemProductId =
                   getProductId(
                     item?.product
                   );
 
-                return (
-                  String(id) ===
-                    String(
-                      productId
-                    ) &&
+                const itemSize =
                   cleanString(
                     item?.selectedSize
-                  ).toLowerCase() ===
-                    selectedSize.toLowerCase() &&
+                  );
+
+                const itemColor =
                   cleanString(
                     item?.selectedColor
-                  ).toLowerCase() ===
-                    selectedColor.toLowerCase() &&
+                  );
+
+                const itemSKU =
                   cleanString(
                     item?.selectedVariantSKU
-                  ).toLowerCase() ===
-                    selectedVariantSKU.toLowerCase()
+                  );
+
+                const itemKey =
+                  getVariantKey(
+                    String(
+                      itemProductId
+                    ),
+                    itemSize,
+                    itemColor,
+                    itemSKU
+                  );
+
+                return (
+                  itemKey ===
+                  newKey
                 );
               }
             );
@@ -1459,58 +1370,27 @@ export function CartProvider({
             existingIndex >=
             0
           ) {
-            normalizedItems[
+            existingItems[
               existingIndex
-            ].quantity +=
-              quantity;
+            ].quantity =
+              Number(
+                existingItems[
+                  existingIndex
+                ].quantity || 0
+              ) + quantity;
           } else {
-            normalizedItems.push({
-              product:
-                typeof product ===
-                "object"
-                  ? product
-                  : {
-                      _id:
-                        productId,
-
-                      name:
-                        "Product",
-
-                      images:
-                        [],
-
-                      price:
-                        itemPrice,
-
-                      stock:
-                        variantStock,
-                    },
-
-              selectedSize,
-
-              selectedColor,
-
-              selectedVariantSKU,
-
-              variantId,
-
-              stock:
-                variantStock,
-
-              price:
-                itemPrice,
-
-              quantity,
-            });
+            existingItems.push(
+              newItem
+            );
           }
 
           saveGuestCart(
-            normalizedItems
+            existingItems
           );
 
           updateCartState({
             items:
-              normalizedItems,
+              existingItems,
           });
         }
 
@@ -1521,7 +1401,7 @@ export function CartProvider({
         );
       } catch (error) {
         console.log(
-          "ADD CART ERROR",
+          "ADD CART ERROR:",
           error
         );
       } finally {
@@ -1529,14 +1409,15 @@ export function CartProvider({
       }
     };
 
-  /* =======================================================
-     UPDATE ITEM
-  ======================================================= */
+  // ====================================================
+  // UPDATE ITEM
+  // ====================================================
 
   const updateItem =
     async (
       productId: string,
-      quantity: number
+      quantity: number,
+      variant: CartItemVariant = {}
     ) => {
       try {
         setCartLoading(true);
@@ -1546,11 +1427,86 @@ export function CartProvider({
             "token"
           );
 
+        let selectedSize =
+          cleanString(
+            variant?.selectedSize ||
+              variant?.size ||
+              variant?.variant?.size ||
+              variant?.variant?.capacity ||
+              variant?.variant?.storage ||
+              ""
+          );
+
+        let selectedColor =
+          cleanString(
+            variant?.selectedColor ||
+              variant?.color ||
+              variant?.variant?.color ||
+              ""
+          );
+
+        let selectedSKU =
+          cleanString(
+            variant?.selectedVariantSKU ||
+              variant?.variant?.sku ||
+              ""
+          );
+
+        if (
+          !selectedSize &&
+          !selectedColor &&
+          !selectedSKU
+        ) {
+          const currentItem =
+            cart?.items?.find(
+              (item: any) =>
+                String(
+                  getProductId(
+                    item?.product
+                  )
+                ) ===
+                String(
+                  productId
+                )
+            );
+
+          if (currentItem) {
+            selectedSize =
+              cleanString(
+                currentItem?.selectedSize
+              );
+
+            selectedColor =
+              cleanString(
+                currentItem?.selectedColor
+              );
+
+            selectedSKU =
+              cleanString(
+                currentItem?.selectedVariantSKU
+              );
+          }
+        }
+
         if (token) {
           const data =
             await updateCartAPI(
               productId,
-              quantity
+              quantity,
+              {
+                size:
+                  selectedSize,
+
+                color:
+                  selectedColor,
+
+                selectedSize,
+
+                selectedColor,
+
+                selectedVariantSKU:
+                  selectedSKU,
+              }
             );
 
           updateCartState(
@@ -1560,38 +1516,68 @@ export function CartProvider({
           const items =
             getGuestCart();
 
-          const normalizedItems =
-            [...items];
-
-          /*
-           * Update matching product.
-           */
-
-          const item =
-            normalizedItems.find(
-              (i: any) =>
-                String(
-                  getProductId(
-                    i?.product
-                  )
-                ) ===
-                String(
-                  productId
-                )
+          const targetKey =
+            getVariantKey(
+              String(
+                productId
+              ),
+              selectedSize,
+              selectedColor,
+              selectedSKU
             );
 
-          if (item) {
-            item.quantity =
-              quantity;
-          }
+          const updatedItems =
+            items.map(
+              (item: any) => {
+                const itemProductId =
+                  getProductId(
+                    item?.product
+                  );
+
+                const itemKey =
+                  getVariantKey(
+                    String(
+                      itemProductId
+                    ),
+                    cleanString(
+                      item?.selectedSize
+                    ),
+                    cleanString(
+                      item?.selectedColor
+                    ),
+                    cleanString(
+                      item?.selectedVariantSKU
+                    )
+                  );
+
+                if (
+                  itemKey ===
+                  targetKey
+                ) {
+                  return {
+                    ...item,
+
+                    quantity:
+                      Math.max(
+                        1,
+                        Number(
+                          quantity
+                        )
+                      ),
+                  };
+                }
+
+                return item;
+              }
+            );
 
           saveGuestCart(
-            normalizedItems
+            updatedItems
           );
 
           updateCartState({
             items:
-              normalizedItems,
+              updatedItems,
           });
         }
 
@@ -1602,7 +1588,7 @@ export function CartProvider({
         );
       } catch (error) {
         console.log(
-          "UPDATE CART ERROR",
+          "UPDATE CART ERROR:",
           error
         );
       } finally {
@@ -1610,13 +1596,14 @@ export function CartProvider({
       }
     };
 
-  /* =======================================================
-     REMOVE ITEM
-  ======================================================= */
+  // ====================================================
+  // REMOVE ITEM
+  // ====================================================
 
   const removeItem =
     async (
-      productId: string
+      productId: string,
+      variant: CartItemVariant = {}
     ) => {
       try {
         setCartLoading(true);
@@ -1626,33 +1613,130 @@ export function CartProvider({
             "token"
           );
 
+        let selectedSize =
+          cleanString(
+            variant?.selectedSize ||
+              variant?.size ||
+              variant?.variant?.size ||
+              variant?.variant?.capacity ||
+              variant?.variant?.storage ||
+              ""
+          );
+
+        let selectedColor =
+          cleanString(
+            variant?.selectedColor ||
+              variant?.color ||
+              variant?.variant?.color ||
+              ""
+          );
+
+        let selectedSKU =
+          cleanString(
+            variant?.selectedVariantSKU ||
+              variant?.variant?.sku ||
+              ""
+          );
+
+        if (
+          !selectedSize &&
+          !selectedColor &&
+          !selectedSKU
+        ) {
+          const currentItem =
+            cart?.items?.find(
+              (item: any) =>
+                String(
+                  getProductId(
+                    item?.product
+                  )
+                ) ===
+                String(
+                  productId
+                )
+            );
+
+          if (currentItem) {
+            selectedSize =
+              cleanString(
+                currentItem?.selectedSize
+              );
+
+            selectedColor =
+              cleanString(
+                currentItem?.selectedColor
+              );
+
+            selectedSKU =
+              cleanString(
+                currentItem?.selectedVariantSKU
+              );
+          }
+        }
+
         if (token) {
           const data =
             await removeCartAPI(
-              productId
+              productId,
+              {
+                size:
+                  selectedSize,
+
+                color:
+                  selectedColor,
+
+                selectedSize,
+
+                selectedColor,
+
+                selectedVariantSKU:
+                  selectedSKU,
+              }
             );
 
           updateCartState(
             data
           );
 
-          /*
-           * Remove local variant metadata
-           * for this product.
-           */
-
           const metadata =
             getVariantMetadata();
 
           const filtered =
             metadata.filter(
-              (item) =>
-                String(
-                  item.productId
-                ) !==
-                String(
-                  productId
-                )
+              (item) => {
+                if (
+                  String(
+                    item.productId
+                  ) !==
+                  String(
+                    productId
+                  )
+                ) {
+                  return true;
+                }
+
+                const sameSKU =
+                  selectedSKU &&
+                  cleanString(
+                    item.selectedVariantSKU
+                  ).toLowerCase() ===
+                    selectedSKU.toLowerCase();
+
+                const sameSizeColor =
+                  cleanString(
+                    item.selectedSize
+                  ).toLowerCase() ===
+                    selectedSize.toLowerCase() &&
+                  cleanString(
+                    item.selectedColor
+                  ).toLowerCase() ===
+                    selectedColor.toLowerCase();
+
+                return !(
+                  sameSKU ||
+                  sameSizeColor
+                );
+              }
             );
 
           localStorage.setItem(
@@ -1665,26 +1749,54 @@ export function CartProvider({
           const items =
             getGuestCart();
 
-          const normalizedItems =
+          const targetKey =
+            getVariantKey(
+              String(
+                productId
+              ),
+              selectedSize,
+              selectedColor,
+              selectedSKU
+            );
+
+          const filteredItems =
             items.filter(
-              (item: any) =>
-                String(
+              (item: any) => {
+                const itemProductId =
                   getProductId(
                     item?.product
-                  )
-                ) !==
-                String(
-                  productId
-                )
+                  );
+
+                const itemKey =
+                  getVariantKey(
+                    String(
+                      itemProductId
+                    ),
+                    cleanString(
+                      item?.selectedSize
+                    ),
+                    cleanString(
+                      item?.selectedColor
+                    ),
+                    cleanString(
+                      item?.selectedVariantSKU
+                    )
+                  );
+
+                return (
+                  itemKey !==
+                  targetKey
+                );
+              }
             );
 
           saveGuestCart(
-            normalizedItems
+            filteredItems
           );
 
           updateCartState({
             items:
-              normalizedItems,
+              filteredItems,
           });
         }
 
@@ -1695,7 +1807,7 @@ export function CartProvider({
         );
       } catch (error) {
         console.log(
-          "REMOVE CART ERROR",
+          "REMOVE CART ERROR:",
           error
         );
       } finally {
@@ -1703,9 +1815,9 @@ export function CartProvider({
       }
     };
 
-  /* =======================================================
-     CLEAR CART
-  ======================================================= */
+  // ====================================================
+  // CLEAR CART
+  // ====================================================
 
   const clearCart =
     async () => {
@@ -1722,7 +1834,7 @@ export function CartProvider({
         }
 
         localStorage.removeItem(
-          "guestCart"
+          GUEST_CART_KEY
         );
 
         localStorage.removeItem(
@@ -1731,9 +1843,7 @@ export function CartProvider({
 
         setCart({
           items: [],
-
           total: 0,
-
           totalItems: 0,
         });
 
@@ -1744,7 +1854,7 @@ export function CartProvider({
         );
       } catch (error) {
         console.log(
-          "CLEAR CART ERROR",
+          "CLEAR CART ERROR:",
           error
         );
       } finally {
@@ -1752,9 +1862,9 @@ export function CartProvider({
       }
     };
 
-  /* =======================================================
-     TOTAL ITEMS
-  ======================================================= */
+  // ====================================================
+  // TOTAL ITEMS
+  // ====================================================
 
   const totalItems =
     cart?.items?.reduce(
@@ -1764,14 +1874,14 @@ export function CartProvider({
       ) =>
         total +
         Number(
-          item.quantity || 0
+          item?.quantity || 0
         ),
       0
     ) || 0;
 
-  /* =======================================================
-     PROVIDER
-  ======================================================= */
+  // ====================================================
+  // PROVIDER
+  // ====================================================
 
   return (
     <CartContext.Provider
@@ -1800,9 +1910,9 @@ export function CartProvider({
   );
 }
 
-/* =========================================================
-   HOOK
-========================================================= */
+// ======================================================
+// HOOK
+// ======================================================
 
 export default function useCartContext() {
   const context =
